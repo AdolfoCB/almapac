@@ -3,10 +3,11 @@
 
 import { useEffect, useState } from "react";
 import { FiPlus, FiTrash2, FiEdit } from "react-icons/fi";
-import Loader from "../../../../components/Loader";
+import Loader from "@/components/Loader";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import dynamic from "next/dynamic";
+import { EstadoBitacora } from "@/lib/estadoBitacora";
 
 // Importar react-select y react-select/creatable de forma dinámica
 const Select = dynamic(() => import("react-select"), { ssr: false });
@@ -18,14 +19,6 @@ const CreatableSelect = dynamic(
 // =====================================================
 // SISTEMA DE ESTADOS
 // =====================================================
-
-// Estados de bitácora
-export enum EstadoBitacora {
-  CREADA = "CREADA",
-  EN_PROCESO = "EN_PROCESO", 
-  COMPLETADA = "COMPLETADA",
-  ELIMINADA = "ELIMINADA"
-}
 
 // Configuración de estados
 const ESTADOS_CONFIG = {
