@@ -1,14 +1,12 @@
 // src/app/api/auth/validate-session/route.js - API para validar sesiones en base de datos
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma'; // Usar el prisma client configurado
+import { decode } from "next-auth/jwt";
 
 export async function POST(request) {
   try {
     // Obtener datos del request
-    const { token, userId, isApiToken } = await request.json();
+    const { token, userId, sessionId, isPageValidation } = await request.json();
 
     // Validación de parámetros requeridos
     if (!token || !userId) {
@@ -23,12 +21,20 @@ export async function POST(request) {
       );
     }
 
-    console.log(`🔍 [VALIDATE SESSION] Validando sesión para usuario ${userId}, isApiToken: ${isApiToken}`);
+    console.log(`🔍 [VALIDATE SESSION] Validando sesión para usuario ${userId}, sessionId: ${sessionId}, isPage: ${isPageValidation}`);
 
-    // 1. Verificar el token JWT
+    // 1. Verificar el token JWT de NextAuth
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.NEXTAUTH_SECRET);
+      decoded = await decode({
+        token: token,
+        secret: process.env.NEXTAUTH_SECRET
+      });
+
+      if (!decoded) {
+        throw new Error('Token decode returned null');
+      }
+
       console.log(`✅ [VALIDATE SESSION] JWT válido para usuario: ${decoded.username}`);
     } catch (jwtError) {
       console.log(`❌ [VALIDATE SESSION] JWT inválido:`, jwtError.message);
@@ -37,7 +43,7 @@ export async function POST(request) {
           error: 'Token JWT inválido', 
           code: 'INVALID_JWT',
           details: jwtError.message,
-          shouldRevoke: true // SÍ cerrar sesión - token no coincide
+          shouldRevoke: true // SÍ cerrar sesión - token no válido
         },
         { status: 401 }
       );
@@ -56,14 +62,14 @@ export async function POST(request) {
       );
     }
 
-    // 3. Buscar el usuario en la base de datos
+    // 3. Buscar el usuario en la base de datos con el esquema correcto
     const user = await prisma.user.findUnique({
       where: { id: parseInt(userId) },
       include: { 
         role: {
           select: {
             id: true,
-            name: true
+            name: true // Campo correcto según el esquema (mapeado a 'nombre' en DB)
           }
         }
       }
@@ -75,7 +81,7 @@ export async function POST(request) {
         { 
           error: 'Usuario no encontrado', 
           code: 'USER_NOT_FOUND',
-          shouldRevoke: false // NO cerrar sesión por usuario no encontrado
+          shouldRevoke: true // SÍ cerrar sesión - usuario no existe
         },
         { status: 401 }
       );
@@ -86,25 +92,32 @@ export async function POST(request) {
       console.log(`❌ [VALIDATE SESSION] Usuario inactivo: ${userId}, eliminado: ${user.eliminado}, activo: ${user.activo}`);
       return NextResponse.json(
         { 
-          error: 'Usuario no encontrado o inactivo', 
+          error: 'Usuario inactivo o eliminado', 
           code: 'USER_INACTIVE',
-          shouldRevoke: false // NO cerrar sesión por usuario inactivo
+          shouldRevoke: true // SÍ cerrar sesión - usuario inactivo
         },
         { status: 401 }
       );
     }
 
     // 5. Buscar sesión activa del usuario que coincida con el token
+    const sessionQuery = {
+      userId: user.id,
+      sessionToken: token, // El sessionToken debe coincidir con el JWT enviado
+      isActive: true,
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gt: new Date() } }
+      ]
+    };
+
+    // Si tenemos sessionId específico, agregarlo a la consulta
+    if (sessionId) {
+      sessionQuery.id = sessionId;
+    }
+
     const activeSession = await prisma.userSession.findFirst({
-      where: {
-        userId: user.id,
-        sessionToken: token, // ✅ El sessionToken debe coincidir con el JWT enviado
-        isActive: true,
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } }
-        ]
-      },
+      where: sessionQuery,
       orderBy: { createdAt: 'desc' }
     });
 
@@ -114,7 +127,7 @@ export async function POST(request) {
         { 
           error: 'No hay sesión activa con este token', 
           code: 'NO_ACTIVE_SESSION',
-          shouldRevoke: true // SÍ cerrar sesión - token no coincide
+          shouldRevoke: true // SÍ cerrar sesión - sesión no encontrada
         },
         { status: 401 }
       );
@@ -153,13 +166,21 @@ export async function POST(request) {
         { 
           error: 'Sesión no está activa', 
           code: 'SESSION_INACTIVE',
-          shouldRevoke: true // SÍ cerrar sesión - sesión está en activa = false
+          shouldRevoke: true // SÍ cerrar sesión - sesión inactiva
         },
         { status: 401 }
       );
     }
 
-    // 8. Todo válido - preparar respuesta
+    // 8. Actualizar última actividad si es validación de página
+    if (isPageValidation) {
+      await prisma.userSession.update({
+        where: { id: activeSession.id },
+        data: { lastActivity: new Date() }
+      });
+    }
+
+    // 9. Todo válido - preparar respuesta con información completa
     const responseData = {
       valid: true,
       sessionId: activeSession.id,
@@ -167,7 +188,7 @@ export async function POST(request) {
         id: user.id,
         username: user.username,
         roleId: user.roleId,
-        roleName: user.role.name,
+        roleName: user.role?.name || `ROLE_${user.roleId}`,
         codigo: user.codigo,
         nombreCompleto: user.nombreCompleto,
         email: user.email
@@ -178,11 +199,19 @@ export async function POST(request) {
         lastActivity: activeSession.lastActivity,
         expiresAt: activeSession.expiresAt,
         loginAttempts: activeSession.loginAttempts,
-        isActive: activeSession.isActive
+        isActive: activeSession.isActive,
+        // Información del dispositivo
+        device: {
+          os: activeSession.deviceOS,
+          browser: activeSession.browser,
+          model: activeSession.deviceModel,
+          type: activeSession.deviceType,
+          ipAddress: activeSession.ipAddress
+        }
       }
     };
 
-    console.log(`✅ [VALIDATE SESSION] Sesión válida para ${user.username} (${user.role.name})`);
+    console.log(`✅ [VALIDATE SESSION] Sesión válida para ${user.username} (${user.role?.name})`);
 
     return NextResponse.json(responseData);
 
@@ -197,34 +226,131 @@ export async function POST(request) {
       },
       { status: 500 }
     );
-  } finally {
-    // Cerrar conexión de Prisma
-    await prisma.$disconnect();
   }
 }
 
-// Método GET no permitido
-export async function GET() {
+// Método GET para obtener información de sesión (útil para debugging)
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get('sessionId');
+    const userId = searchParams.get('userId');
+
+    if (!sessionId && !userId) {
+      return NextResponse.json(
+        { 
+          error: 'Se requiere sessionId o userId como parámetro de consulta',
+          example: '/api/auth/validate-session?sessionId=xxx o ?userId=123'
+        },
+        { status: 400 }
+      );
+    }
+
+    const whereClause = sessionId 
+      ? { id: sessionId }
+      : { userId: parseInt(userId), isActive: true };
+
+    // Obtener información de la sesión
+    const sessions = await prisma.userSession.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            nombreCompleto: true,
+            email: true,
+            role: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { lastActivity: 'desc' },
+      take: sessionId ? 1 : 10 // Si es por userId, limitar a 10 sesiones
+    });
+
+    if (sessions.length === 0) {
+      return NextResponse.json(
+        { error: 'Sesión(es) no encontrada(s)' },
+        { status: 404 }
+      );
+    }
+
+    const sessionsWithMetrics = sessions.map(session => {
+      const now = new Date();
+      const lastActivityAgo = Math.floor((now.getTime() - session.lastActivity.getTime()) / 1000);
+      const timeRemaining = session.expiresAt ? 
+        Math.max(0, Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000)) : null;
+
+      return {
+        sessionId: session.id,
+        isActive: session.isActive,
+        user: {
+          ...session.user,
+          roleName: session.user.role?.name
+        },
+        device: {
+          os: session.deviceOS,
+          browser: session.browser,
+          model: session.deviceModel,
+          type: session.deviceType,
+          ipAddress: session.ipAddress
+        },
+        activity: {
+          createdAt: session.createdAt,
+          lastActivity: session.lastActivity,
+          lastActivityAgo: lastActivityAgo,
+          expiresAt: session.expiresAt,
+          timeRemaining: timeRemaining,
+          isExpired: session.expiresAt ? session.expiresAt < now : false
+        },
+        endInfo: {
+          endedAt: session.endedAt,
+          endReason: session.endReason
+        },
+        loginAttempts: session.loginAttempts
+      };
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: sessionId ? sessionsWithMetrics[0] : sessionsWithMetrics,
+      total: sessions.length
+    });
+
+  } catch (error) {
+    console.error('❌ [VALIDATE SESSION GET] Error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Error interno del servidor',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// Métodos no permitidos
+export async function PUT() {
   return NextResponse.json(
     { 
       error: 'Método no permitido',
-      message: 'Esta API solo acepta requests POST' 
+      allowedMethods: ['GET', 'POST']
     },
-    { status: 405 }
-  );
-}
-
-// Otros métodos no permitidos
-export async function PUT() {
-  return NextResponse.json(
-    { error: 'Método no permitido' },
     { status: 405 }
   );
 }
 
 export async function DELETE() {
   return NextResponse.json(
-    { error: 'Método no permitido' },
+    { 
+      error: 'Método no permitido',
+      allowedMethods: ['GET', 'POST']
+    },
     { status: 405 }
   );
 }
