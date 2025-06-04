@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       Int      // Relación con User
+  sessionToken String   @db.Text // Usar TEXT para almacenamiento sin límite
+  isActive     Boolean  @default(true) // Si la sesión está activa
+
+  // Timestamps de gestión
+  createdAt    DateTime @default(now()) // Cuando se creó la sesión
+  lastActivity DateTime @default(now()) // Última vez que hubo actividad
+  expiresAt    DateTime? // Cuándo expira la sesión
+  endedAt      DateTime? // Cuándo terminó la sesión (si terminó)
+  endReason    String?  // Razón por la que terminó
+
+  // Metadatos de seguridad (existente)
+  loginAttempts Int?    @default(0) // Intentos de login fallidos antes de esta sesión
+
+  // 🆕 NUEVOS CAMPOS SIMPLES PARA DISPOSITIVO
+  deviceOS     String?  // Sistema operativo (Windows 10, macOS, Android 13, iOS 17)
+  browser      String?  // Navegador (Chrome 120.0, Firefox 121.0, Safari 17.1)
+  deviceModel  String?  // Modelo del dispositivo (iPhone, Samsung SM-G973F, etc.)
+  deviceType   String?  // Tipo (mobile, desktop, tablet)
+  ipAddress    String?  // Dirección IP del cliente
+
+  // Relación con User
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([sessionToken(length: 255)])
+  @@index([isActive, expiresAt])
+  @@index([createdAt])
+  @@index([deviceOS])
+  @@index([deviceType])
+  @@index([ipAddress])
+
+  @@map("user_sessions")
+}
+
+model User {
+  id                 Int                   @id @default(autoincrement()) @map("id") @unique
+  username           String                @unique @map("username")
+  nombreCompleto     String?               @map("nombre_completo")
+  codigo             String?               @map("codigo")
+  email              String?               @map("email")
+  password           String                @map("password")
+  eliminado          Boolean               @default(false) @map("eliminado")
+  activo             Boolean               @default(true)  @map("activo")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updateAt           DateTime              @updatedAt @map("updated_at")
+
+  equipos            Equipo[]
+  recepcionTraslado  RecepcionTraslado[]
+  bitacoras          BitacoraBarco[]
+
+  roleId             Int                   @map("role_id")
+  role               Role                  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  userSessions       UserSession[]
+
+  @@index([roleId], map: "users_role_id_fkey")
+  @@map("usuarios")
+}
+
+model Role {
+  id    Int     @id @default(autoincrement()) @map("id") @unique
+  name  String  @unique @map("nombre")
+  users User[]
+
+  @@map("roles")
+}
+
+model Barco {
+  id                     Int       @id @default(autoincrement()) @map("id")
+  muelle                 String?   @map("muelle")
+  vaporBarco             String?   @map("vapor_barco")
+  fechaArribo            String?   @map("fecha_arribo")
+  horaArribo             String?   @map("hora_arribo")
+  fechaAtraque           String?   @map("fecha_atraque")
+  horaAtraque            String?   @map("hora_atraque")
+  fechaRecibido          String?   @map("fecha_recibido")
+  horaRecibido           String?   @map("hora_recibido")
+  fechaInicioOperaciones String?   @map("fecha_inicio_operaciones")
+  horaInicioOperaciones  String?   @map("hora_inicio_operaciones")
+  fechaFinOperaciones    String?   @map("fecha_fin_operaciones")
+  horaFinOperaciones     String?   @map("hora_fin_operaciones")
+  tipoCarga              String?   @db.Text @map("tipo_carga")
+  sistemaUtilizado       String?   @db.Text @map("sistema_utilizado")
+  fechaRegistro          String?   @map("fecha_registro")
+  activo                 Boolean   @default(true) @map("activo")
+
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  bitacoras              BitacoraBarco[]
+
+  @@map("barcos")
+}
+
+model BitacoraBarco {
+  id               Int       @id @default(autoincrement()) @map("id")
+  userId           Int       @map("user_id")
+  userName         String?   @map("user_name")
+  barcoId          Int?      @map("barco_id")
+  vaporBarco       String?   @map("vapor_barco")
+  fechaInicio      String?   @map("fecha_inicio")
+  fecha            String?   @map("fecha")
+  fechaCierre      String?   @map("fecha_cierre")
+  muellero         String?   @map("muellero")
+  turnoInicio      String?   @map("turno_inicio")
+  turnoFin         String?   @map("turno_fin")
+  observaciones    String?   @db.LongText @map("observaciones")
+  eliminado        Boolean   @default(false)
+  estado           String    @map("estado")
+
+  operaciones      Json      @db.Json @map("operaciones")
+
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  barco            Barco?    @relation(fields: [barcoId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "bitacora_user_id_fkey")
+  @@index([barcoId], map: "bitacora_barco_id_fkey")
+  @@map("bitacoras_barcos")
+}
+
+model Equipo {
+  id              Int      @id @default(autoincrement()) @map("id")
+  userId          Int?     @map("user_id")
+  userName        String?  @map("user_name")
+  equipo          String   @map("equipo")
+  horometro       String   @map("horometro")
+  operador        String   @map("operador")
+  fecha           String   @map("fecha")
+  hora            String   @map("hora")
+  horaFin         String   @map("hora_fin")
+  tiempoTotal     String   @map("tiempo_total")
+  turnoInicio     String   @map("turno_inicio")
+  turnoFin        String   @map("turno_fin")
+  recomendaciones String?  @db.LongText @map("recomendaciones")
+  inspecciones    Json     @db.Json @map("inspecciones")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "equipos_user_id_fkey")
+  @@map("equipos")
+}
+
+model Producto {
+  id           Int      @id @default(autoincrement()) @map("id")
+  nombre       String   @map("nombre") @unique
+  descripcion  String?  @db.LongText @map("descripcion")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("productos")
+}
+
+model BarcoRecepcion {
+  id             Int      @id @default(autoincrement()) @map("id")
+  vaporBarco     String?  @map("vapor_barco")
+  productos      Json?    @db.Json @map("productos")
+  puntosDescarga Json?    @db.Json @map("puntos_descarga")
+  transportes    Json?    @db.Json @map("transportes")
+  observaciones  String?  @db.LongText @map("observaciones")
+  activo         Boolean  @default(true) @map("activo")
+  fechaRegistro  String?   @map("fecha_registro")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  recepciones    RecepcionTraslado[]
+
+  @@map("barcos_recepcion")
+}
+
+model RecepcionTraslado {
+  id              Int      @id @default(autoincrement()) @map("id")
+  userId          Int      @map("user_id")
+  userName        String?  @map("user_name")
+  barcoId         Int?     @map("barco_recepcion_id")
+  fechaInicio     String?  @map("fecha_inicio")
+  fecha           String?  @map("fecha")
+  fechaCierre     String?  @map("fecha_cierre")
+  producto        String?  @map("producto")
+  nombreBarco     String?  @map("nombre_barco")
+  chequero        String?  @map("chequero")
+  turnoInicio     String?  @map("turno_inicio")
+  turnoFin        String?  @map("turno_fin")
+  puntoCarga      String?  @map("punto_carga")
+  puntoDescarga   String?  @map("punto_descarga")
+  bitacoras       Json     @db.Json @map("bitacoras")
+  eliminado       Boolean   @default(false)
+  estado          String    @map("estado")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  barcoRecepcion  BarcoRecepcion? @relation(fields: [barcoId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "recepcion_user_id_fkey")
+  @@index([barcoId], map: "recepcion_barco_recepcion_id_fkey")
+  @@map("recepciones_traslados")
+}
+
+model EmpresaTransporte {
+  id             Int      @id @default(autoincrement()) @map("id")
+  nombre         String   @map("nombre")
+  motoristas     Json     @db.Json @map("motoristas")
+  activo         Boolean  @default(true) @map("activo")
+  fechaRegistro  String?   @map("fecha_registro")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("empresas_transporte")
+}

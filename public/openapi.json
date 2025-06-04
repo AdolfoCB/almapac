@@ -1,0 +1,836 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Mi API v1",
+    "version": "1.0.0",
+    "description": "Documentación generada automáticamente desde Prisma + Next.js App Router"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000"
+    }
+  ],
+  "paths": {
+    "/api/v1/barcos": {
+      "get": {
+        "summary": "GET /api/v1/barcos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/barcos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/barcos/{id}": {
+      "get": {
+        "summary": "GET /api/v1/barcos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/barcos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/barcos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/bitacoras/export-excel": {
+      "get": {
+        "summary": "GET /api/v1/bitacoras/export-excel",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/bitacoras": {
+      "get": {
+        "summary": "GET /api/v1/bitacoras",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/bitacoras",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/bitacoras/{id}": {
+      "get": {
+        "summary": "GET /api/v1/bitacoras/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/bitacoras/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/equipos/export-excel": {
+      "get": {
+        "summary": "GET /api/v1/equipos/export-excel",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/equipos": {
+      "get": {
+        "summary": "GET /api/v1/equipos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/equipos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "GET /api/v1/health",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/profile": {
+      "get": {
+        "summary": "GET /api/v1/profile",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/barcos": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/barcos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/recepcion/barcos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/barcos/{id}": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/barcos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/recepcion/barcos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/recepcion/barcos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/bitacoras/{id}": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/bitacoras/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/export-excel": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/export-excel",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/productos": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/productos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/recepcion/productos",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/productos/{id}": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/productos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/recepcion/productos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/recepcion/productos/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion": {
+      "get": {
+        "summary": "GET /api/v1/recepcion",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/recepcion",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/transportes": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/transportes",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/recepcion/transportes",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/transportes/{id}": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/transportes/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/recepcion/transportes/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/recepcion/transportes/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/recepcion/{id}": {
+      "get": {
+        "summary": "GET /api/v1/recepcion/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/recepcion/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "summary": "GET /api/v1/roles",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/roles",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/roles/{id}": {
+      "get": {
+        "summary": "GET /api/v1/roles/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/roles/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/roles/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/transportes": {
+      "post": {
+        "summary": "POST /api/v1/transportes",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "summary": "GET /api/v1/users",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/v1/users",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "summary": "GET /api/v1/users/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "summary": "PUT /api/v1/users/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "summary": "DELETE /api/v1/users/{id}",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "nombreCompleto": {
+            "type": "string"
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "eliminado": {
+            "type": "boolean"
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "equipos": {},
+          "recepcionTraslado": {},
+          "roleId": {
+            "type": "integer"
+          },
+          "role": {},
+          "@@index([roleId],": {}
+        },
+        "required": [
+          "id",
+          "username",
+          "nombreCompleto",
+          "codigo",
+          "eliminado",
+          "activo",
+          "createdAt",
+          "equipos",
+          "recepcionTraslado",
+          "roleId",
+          "role",
+          "@@index([roleId],"
+        ]
+      },
+      "Role": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "users": {}
+        },
+        "required": [
+          "id",
+          "name",
+          "users"
+        ]
+      },
+      "Barco": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "muelle": {
+            "type": "string"
+          },
+          "vaporBarco": {
+            "type": "string"
+          },
+          "fechaArribo": {
+            "type": "string"
+          },
+          "horaArribo": {
+            "type": "string"
+          },
+          "fechaAtraque": {
+            "type": "string"
+          },
+          "horaAtraque": {
+            "type": "string"
+          },
+          "fechaRecibido": {
+            "type": "string"
+          },
+          "horaRecibido": {
+            "type": "string"
+          },
+          "fechaInicioOperaciones": {
+            "type": "string"
+          },
+          "horaInicioOperaciones": {
+            "type": "string"
+          },
+          "fechaFinOperaciones": {
+            "type": "string"
+          },
+          "horaFinOperaciones": {
+            "type": "string"
+          },
+          "tipoCarga": {
+            "type": "string"
+          },
+          "sistemaUtilizado": {
+            "type": "string"
+          },
+          "bitacoras": {},
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "bitacoras",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "BitacoraBarco": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "fechaInicio": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string"
+          },
+          "fechaCierre": {
+            "type": "string"
+          },
+          "nombreMuellero": {
+            "type": "string"
+          },
+          "turnoInicio": {
+            "type": "string"
+          },
+          "turnoFin": {
+            "type": "string"
+          },
+          "observaciones": {
+            "type": "string"
+          },
+          "barcoId": {
+            "type": "integer"
+          },
+          "barco": {},
+          "operaciones": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "@@index([userId],": {},
+          "@@index([barcoId],": {}
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "updatedAt",
+          "@@index([userId],",
+          "@@index([barcoId],"
+        ]
+      },
+      "Equipo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "equipo": {
+            "type": "string"
+          },
+          "horometro": {
+            "type": "string"
+          },
+          "operador": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string"
+          },
+          "hora": {
+            "type": "string"
+          },
+          "horaFin": {
+            "type": "string"
+          },
+          "tiempoTotal": {
+            "type": "string"
+          },
+          "turnoInicio": {
+            "type": "string"
+          },
+          "turnoFin": {
+            "type": "string"
+          },
+          "recomendaciones": {
+            "type": "string"
+          },
+          "user": {},
+          "inspecciones": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "@@index([userId],": {}
+        },
+        "required": [
+          "id",
+          "equipo",
+          "horometro",
+          "operador",
+          "fecha",
+          "hora",
+          "horaFin",
+          "tiempoTotal",
+          "turnoInicio",
+          "turnoFin",
+          "createdAt",
+          "updatedAt",
+          "@@index([userId],"
+        ]
+      },
+      "Producto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "BarcoRecepcion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "vaporBarco": {
+            "type": "string"
+          },
+          "productos": {
+            "type": "object"
+          },
+          "puntosDescarga": {
+            "type": "object"
+          },
+          "transportes": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "RecepcionTraslado": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "barcoId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string"
+          },
+          "hora": {
+            "type": "string"
+          },
+          "producto": {
+            "type": "string"
+          },
+          "nombreBarco": {
+            "type": "string"
+          },
+          "chequero": {
+            "type": "string"
+          },
+          "turnoInicio": {
+            "type": "string"
+          },
+          "turnoFin": {
+            "type": "string"
+          },
+          "puntoCarga": {
+            "type": "string"
+          },
+          "puntoDescarga": {
+            "type": "string"
+          },
+          "bitacoras": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "barcoId",
+          "userId",
+          "fecha",
+          "hora",
+          "producto",
+          "nombreBarco",
+          "chequero"
+        ]
+      },
+      "EmpresaTransporte": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "motoristas": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": true,
+    "incremental": true,
+    "module": "esnext",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "strictNullChecks": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/app/*": ["./src/app/*"],
+      "@/lib/*": ["./lib/*"],
+      "@/pages/*": ["./src/pages/*"],
+      "@/constants/*": ["./src/constants/*"],
+      "@/utils/*": ["./src/utils/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/styles/*": ["./src/styles/*"],
+      "@/prisma/*": ["./prisma/*"],
+      "@/public/*": ["./public/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "src/components/WeatherLoader.jsx",
+    "src/components/Loader.jsx",
+    "src/components/PDFBitacora.jsx",
+    "src/components/SVGComponent.jsx",
+    "src/components/Footer.jsx",
+    "src/components/SqueareLoader.jsx",
+    "src/components/LoginForm.tsx",
+    "src/app/soporte/page.jsx",
+    "src/app/proceso/consultar/equipo/page.tsx"
+, "src/components/DataTable.tsx", "src/app/usuarios/page.tsx"  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
