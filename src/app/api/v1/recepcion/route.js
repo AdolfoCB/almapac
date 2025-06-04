@@ -10,22 +10,8 @@ import { authorize } from "@/lib/sessionRoleValidator";
 // SISTEMA DE ESTADOS PARA RECEPCIONES
 // =====================================================
 
-// Estados de recepción
-export const EstadoRecepcion = {
-  CREADA: "CREADA",
-  EN_PROCESO: "EN PROCESO", 
-  COMPLETADA: "COMPLETADA",
-  ELIMINADA: "ELIMINADA"
-};
+import { EstadoRecepcion, determineStateFromContent } from "@/lib/estadoRecepcion";
 
-// Determinar estado automáticamente basado en contenido
-function determineStateFromContent(recepcion) {
-  if (recepcion.eliminado) return EstadoRecepcion.ELIMINADA;
-  // Si ya está completada, mantener ese estado
-  if (recepcion.estado === EstadoRecepcion.COMPLETADA) return EstadoRecepcion.COMPLETADA;
-  if (recepcion.bitacoras && recepcion.bitacoras.length > 0) return EstadoRecepcion.EN_PROCESO;
-  return EstadoRecepcion.CREADA;
-}
 
 // Roles permitidos: ADMINISTRADOR (1), CHEQUERO (3), AUDITOR_PROCESOS (4), MUELLERO_CHEQUERO (7)
 const ALLOWED_ROLES = [1, 3, 4, 7];
