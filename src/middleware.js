@@ -228,35 +228,38 @@ export async function middleware(req) {
     return applySecurityHeaders(NextResponse.next());
   }
 
-  let token = null;
+  let token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-  token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  
-  // if (!token) {
-  //   if (pathname.startsWith("/api")) {
-  //     return NextResponse.json({ error: "Not authenticated", message: "Authentication required" }, { status: 401 });
-  //   }
-  //   return NextResponse.redirect(new URL("/login?authorize=SessionRequired", req.url));
-  // }
+  // Verificar si el token está presente
+  if (!token) {
+    console.log("⚠️ [MIDDLEWARE] No se encontró un token de sesión");
+    return NextResponse.redirect(new URL("/login?authorize=SessionRequired", req.url));
+  }
 
-  // 2. 🆕 Validar sesión contra base de datos
+  // Verificar si el token tiene apiToken y userId
+  if (!token.apiToken || !token.id) {
+    console.log("⚠️ [MIDDLEWARE] Token incompleto, faltan apiToken o userId");
+    return NextResponse.redirect(new URL("/login?authorize=SessionInvalid", req.url));
+  }
+
+  // Validar sesión contra la base de datos
   const pageValidation = await validatePageSessionInDB(token);
-  
+
   if (!pageValidation.valid) {
     console.log(`🚫 [MIDDLEWARE] Sesión inválida para página ${pathname}`);
-    
+
     // Solo revocar sesión si shouldRevoke es true (casos específicos)
     if (pageValidation.shouldRevoke) {
       console.log(`🚫 [MIDDLEWARE] Revocando sesión por: ${pageValidation.code}`);
       return await revokeSession(req, token.sessionId);
     }
-    
+
     // Si no es para revocar, redirect normal al login sin limpiar cookies
     console.log(`⚠️ [MIDDLEWARE] Sesión inválida pero no se revoca: ${pageValidation.code}`);
     return NextResponse.redirect(new URL("/login?authorize=SessionInvalid", req.url));
   }
 
-  // 3. 🆕 Actualizar actividad para sesiones de página también
+  // Actualizar actividad para sesiones de página también
   if (pageValidation.sessionId) {
     await updateSessionActivity(pageValidation.sessionId);
   }
