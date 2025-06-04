@@ -7,21 +7,13 @@ import Loader from "../../../../components/Loader";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import dynamic from "next/dynamic";
-
+import { EstadoRecepcion } from "@/lib/estadoRecepcion";
 // Importar react-select de forma dinámica
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
 // =====================================================
 // SISTEMA DE ESTADOS PARA RECEPCIONES
 // =====================================================
-
-// Estados de recepción
-export enum EstadoRecepcion {
-  CREADA = "CREADA",
-  EN_PROCESO = "EN_PROCESO", 
-  COMPLETADA = "COMPLETADA",
-  ELIMINADA = "ELIMINADA"
-}
 
 // Configuración de estados
 const ESTADOS_CONFIG = {

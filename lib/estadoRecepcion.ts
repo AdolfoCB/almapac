@@ -1,9 +1,10 @@
-export const EstadoRecepcion = {
-  PENDIENTE: 'PENDIENTE',
-  EN_PROCESO: 'EN_PROCESO',
-  COMPLETADA: 'COMPLETADA',
-  ELIMINADA: 'ELIMINADA'
-};
+// Estados de recepción
+export enum EstadoRecepcion {
+  CREADA = "CREADA",
+  EN_PROCESO = "EN_PROCESO", 
+  COMPLETADA = "COMPLETADA",
+  ELIMINADA = "ELIMINADA"
+}
 
 export function determineStateFromContent(recepcion) {
   if (recepcion.eliminado) return EstadoRecepcion.ELIMINADA;
