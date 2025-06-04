@@ -107,7 +107,7 @@ async function validatePageSessionInDB(nextAuthToken) {
     }
 
     // Validar contra la base de datos
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXTAUTH_URL;
     const response = await fetch(`${baseUrl}/api/auth/validate-session`, {
       method: 'POST',
       headers: {
