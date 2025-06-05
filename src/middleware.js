@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-// Mantener toda la configuración original igual...
 const ROLES = {
   ADMINISTRADOR: 1,
   MUELLERO: 2,
@@ -94,53 +93,18 @@ function matchRoute(path, pattern) {
   return path === pattern;
 }
 
+// SIMPLIFICADO: Validación de sesión sin complicaciones de timing
 async function validateSessionInDB(token, req) {
-  console.log(`🔍 [validateSessionInDB] Iniciando validación para ${token.username}`);
-  console.log(`📊 [validateSessionInDB] sessionId: ${token.sessionId}, sessionReady: ${token.sessionReady}`);
+  console.log(`🔍 [validateSessionInDB] Validando ${token.username} con sessionId: ${token.sessionId}`);
   
   if (!token.sessionId) {
-    console.log("⚠️ [validateSessionInDB] Token sin sessionId, permitiendo acceso por compatibilidad");
+    console.log("⚠️ [validateSessionInDB] Sin sessionId, modo degradado");
     return true;
   }
   
-  if (!token.sessionReady) {
-    console.log("⏳ [validateSessionInDB] Sesión no lista, esperando...");
-    
-    const maxWaitTime = 3000;
-    const retryInterval = 200;
-    const maxRetries = maxWaitTime / retryInterval;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      console.log(`🔄 [validateSessionInDB] Intento ${attempt}/${maxRetries} esperando sesión lista`);
-      
-      await new Promise(resolve => setTimeout(resolve, retryInterval));
-      
-      try {
-        const updatedToken = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-        if (updatedToken && updatedToken.sessionReady) {
-          console.log(`✅ [validateSessionInDB] Sesión lista en intento ${attempt}`);
-          token = updatedToken;
-          break;
-        }
-      } catch (error) {
-        console.error(`❌ [validateSessionInDB] Error obteniendo token actualizado:`, error);
-      }
-      
-      if (attempt === maxRetries) {
-        console.log(`⚠️ [validateSessionInDB] Sesión no lista después de ${maxWaitTime}ms, usando modo degradado`);
-        return true;
-      }
-    }
-  }
-  
   try {
-    console.log(`📡 [validateSessionInDB] Realizando validación HTTP para sessionId: ${token.sessionId}`);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      console.log(`⏰ [validateSessionInDB] Timeout de validación`);
-      controller.abort();
-    }, 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos
     
     const response = await fetch(new URL("/api/auth/validate-session", req.url), {
       method: "POST",
@@ -154,114 +118,84 @@ async function validateSessionInDB(token, req) {
     
     clearTimeout(timeoutId);
     
-    console.log(`📊 [validateSessionInDB] Respuesta HTTP: status=${response.status}, ok=${response.ok}`);
-    
     if (!response.ok) {
-      console.log(`❌ [validateSessionInDB] Response no OK: ${response.status}`);
-      return false;
+      console.log(`❌ [validateSessionInDB] HTTP ${response.status}`);
+      return true; // Modo degradado
     }
     
     const data = await response.json();
-    console.log(`📄 [validateSessionInDB] Datos de respuesta:`, data);
+    const isValid = data.valid === true;
+    console.log(`📊 [validateSessionInDB] Resultado: ${isValid}`);
+    return isValid;
     
-    return data.valid === true;
   } catch (error) {
-    console.error("💥 [validateSessionInDB] Error validando sesión en DB:", error);
-    
-    if (error.name === 'AbortError') {
-      console.log("⚠️ [validateSessionInDB] Timeout - usando modo degradado");
-    } else {
-      console.log("⚠️ [validateSessionInDB] Error de red - usando modo degradado");
-    }
-    return true;
+    console.error("💥 [validateSessionInDB] Error, modo degradado:", error.message);
+    return true; // Siempre permitir en caso de error
   }
 }
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
-  console.log(`🛣️ [middleware] Procesando ruta: ${pathname}`);
+  console.log(`🛣️ [middleware] ${pathname}`);
 
-  // NUEVO: Debug de cookies
-  const cookies = req.cookies.getAll();
-  console.log(`🍪 [middleware] Cookies disponibles:`, cookies.map(c => ({ name: c.name, value: c.value?.substring(0, 20) + '...' })));
-
+  // Rutas públicas
   if (PUBLIC_ROUTES.some(r => matchRoute(pathname, r))) {
-    console.log(`🟢 [middleware] Ruta pública permitida: ${pathname}`);
+    console.log(`🟢 [middleware] Ruta pública: ${pathname}`);
     return applySecurityHeaders(NextResponse.next());
   }
 
-  // MEJORADO: Debug del proceso de obtención de token
-  console.log(`🔑 [middleware] Obteniendo token para ${pathname}...`);
-  console.log(`🔧 [middleware] NEXTAUTH_SECRET configurado: ${!!process.env.NEXTAUTH_SECRET}`);
+  // Obtener token
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   
-  const token = await getToken({ 
-    req, 
-    secret: process.env.NEXTAUTH_SECRET,
-    debug: process.env.NEXTAUTH_DEBUG === 'true' 
-  });
-  
-  console.log(`🎫 [middleware] Resultado de getToken:`, {
-    tokenExists: !!token,
+  console.log(`🎫 [middleware] Token:`, {
+    exists: !!token,
     username: token?.username,
     roleId: token?.roleId,
-    sessionId: token?.sessionId,
-    sessionReady: token?.sessionReady,
-    iat: token?.iat,
-    exp: token?.exp,
-    tokenAge: token?.iat ? Date.now() / 1000 - token.iat : 'N/A'
+    sessionId: token?.sessionId?.substring(0, 10) + '...'
   });
   
   if (!token) {
-    console.log(`❌ [middleware] No hay token para ${pathname}, redirigiendo a login`);
+    console.log(`❌ [middleware] Sin token, redirigiendo a login`);
     if (pathname.startsWith("/api")) {
-      return NextResponse.json({ error: "Not authenticated", message: "Authentication required" }, { status: 401 });
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/login?authorize=SessionRequired", req.url));
   }
 
+  // Validar sesión en DB para TODAS las rutas autenticadas
   if (token.sessionId && !pathname.startsWith("/api/auth/validate-session")) {
-    console.log(`🔍 [middleware] Validando sesión en DB para usuario: ${token.username}`);
-    
     const isValidSession = await validateSessionInDB(token, req);
-    console.log(`📊 [middleware] Resultado de validación: ${isValidSession}`);
     
     if (!isValidSession) {
-      console.log(`❌ [middleware] Sesión inválida o expirada para usuario ${token.username}`);
+      console.log(`❌ [middleware] Sesión inválida para ${token.username}`);
       if (pathname.startsWith("/api")) {
-        return NextResponse.json({ error: "Session expired", message: "Session has been revoked or expired" }, { status: 401 });
+        return NextResponse.json({ error: "Session expired" }, { status: 401 });
       }
       const response = NextResponse.redirect(new URL("/login?authorize=SessionExpired", req.url));
       response.cookies.delete("next-auth.session-token");
       response.cookies.delete("next-auth.csrf-token");
       return response;
     }
-    
-    console.log(`✅ [middleware] Sesión válida confirmada para usuario: ${token.username}`);
-  } else if (!token.sessionId) {
-    console.log(`⚠️ [middleware] Token sin sessionId para ${token.username} - sesión antigua o modo degradado`);
   }
 
-  console.log(`🔐 [middleware] Verificando permisos para ruta: ${pathname}`);
+  // Verificación de permisos
   const routeKey = Object.keys(ROUTE_PERMISSIONS).find(route => matchRoute(pathname, route));
   const allowedRoles = routeKey ? ROUTE_PERMISSIONS[routeKey] : null;
   
   if (!allowedRoles) {
-    console.log(`❌ [middleware] Ruta no encontrada en permisos: ${pathname}`);
+    console.log(`❌ [middleware] Ruta no autorizada: ${pathname}`);
     if (pathname.startsWith("/api")) {
-      return NextResponse.json({ error: "Unauthorized", message: "Access denied" }, { status: 403 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     return NextResponse.redirect(new URL("/403", req.url));
   }
   
-  console.log(`📋 [middleware] Roles permitidos para ${pathname}:`, allowedRoles);
-  console.log(`👤 [middleware] Rol del usuario: ${token.roleId}`);
-  
   if (allowedRoles.length === 0 || allowedRoles.includes(token.roleId)) {
-    console.log(`✅ [middleware] Acceso permitido para ${token.username} en ${pathname}`);
+    console.log(`✅ [middleware] Acceso permitido para ${token.username}`);
     return applySecurityHeaders(NextResponse.next());
   }
 
-  console.log(`❌ [middleware] Acceso denegado: roleId ${token.roleId} no permitido en ruta ${pathname}`);
+  console.log(`❌ [middleware] Rol ${token.roleId} no permitido en ${pathname}`);
   return NextResponse.redirect(new URL("/403", req.url));
 }
 
