@@ -5,8 +5,19 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { FiMonitor, FiSmartphone, FiTablet, FiX } from "react-icons/fi";
 
+interface Session {
+  id: string;
+  deviceType: string;
+  browser: string;
+  deviceOS: string;
+  ipAddress: string;
+  lastActivity: string;
+  isActive: boolean;
+  sessionToken: string;
+}
+
 export default function SessionManager() {
-  const [sessions, setSessions] = useState([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const { data: session } = useSession();
 
@@ -103,7 +114,7 @@ export default function SessionManager() {
                   <p className="text-sm text-gray-600">
                     Última actividad: {new Date(sess.lastActivity).toLocaleString()}
                   </p>
-                  {sess.sessionToken === session?.sessionId && (
+                  {sess.sessionToken === session?.user?.email && (
                     <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                       Sesión actual
                     </span>
@@ -111,7 +122,7 @@ export default function SessionManager() {
                 </div>
               </div>
               
-              {sess.isActive && sess.sessionToken !== session?.sessionId && (
+              {sess.isActive && sess.sessionToken !== session?.user?.email && (
                 <button
                   onClick={() => revokeSession(sess.id)}
                   className="text-red-500 hover:text-red-700"
