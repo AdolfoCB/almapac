@@ -1,53 +1,68 @@
-// app/api/sessions/route.js
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { PrismaClient } from "@prisma/client";
+// app/api/v1/sessions/route.js - API para gestionar sesiones
+import { NextResponse } from 'next/server';
+import prisma from "@/lib/prisma";
+import { authorize } from "@/lib/sessionRoleValidator";
+import { Status, handlePrismaError } from "@/lib/status";
 
-const prisma = new PrismaClient();
+const ALLOWED_ROLES = [1]; // solo admin
 
-// GET: Obtener sesiones del usuario actual
+// Obtener todas las sesiones
 export async function GET(request) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-  
   try {
-    const sessions = await prisma.userSession.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
-    });
-    
-    return NextResponse.json(sessions);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al obtener sesiones" }, { status: 500 });
-  }
-}
+    const session = await authorize(request, ALLOWED_ROLES);
+    if (session instanceof NextResponse) return session;
 
-// DELETE: Revocar una sesión específica
-export async function DELETE(request) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-  
-  const { sessionId } = await request.json();
-  
-  try {
-    await prisma.userSession.update({
-      where: { id: sessionId },
-      data: {
-        isActive: false,
-        endedAt: new Date(),
-        endReason: "Revocada por el usuario",
-      },
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const userId = searchParams.get('userId');
+    const isActive = searchParams.get('isActive');
+
+    const where = {};
+    if (userId) where.userId = parseInt(userId);
+    if (isActive !== null && isActive !== undefined) {
+      where.isActive = isActive === 'true';
+    }
+
+    const [sessions, total] = await Promise.all([
+      prisma.userSession.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              username: true,
+              nombreCompleto: true,
+              role: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.userSession.count({ where })
+    ]);
+
+    return NextResponse.json({
+      sessions,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
     });
-    
-    return NextResponse.json({ success: true });
+
   } catch (error) {
-    return NextResponse.json({ error: "Error al revocar sesión" }, { status: 500 });
+    console.error("Error fetching sessions:", error);
+    const prismaErrorResponse = handlePrismaError(error);
+    if (prismaErrorResponse) return prismaErrorResponse.toNextResponse();
+    return Status.internalError("Error al obtener sessions").toNextResponse();
   }
 }

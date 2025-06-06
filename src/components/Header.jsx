@@ -44,40 +44,42 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-white shadow-md z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+      <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
           <button onClick={() => router.push("/")} className="mr-1">
-            <FiHome size={28} className="text-blue-600" />
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200">
+              <FiHome size={20} className="text-white" />
+            </div>
           </button>
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-800">Control de Tiempos</h1>
-            <p className="text-xs sm:text-sm text-gray-500">Panel de Control</p>
+            <h1 className="text-lg sm:text-xl font-bold text-blue-900">ALMAPAC</h1>
+            <p className="text-xs sm:text-sm text-gray-600">Almacenadora del Pacífico</p>
           </div>
         </div>
         <div className="flex items-center space-x-4 mt-2 sm:mt-0">
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center space-x-1 rounded-full transition-all duration-300 transform hover:scale-105"
+              className="flex items-center space-x-2 rounded-full transition-all duration-300 transform hover:scale-105"
               title="Opciones de usuario"
             >
-              <div className="w-8 h-8 rounded-full bg-gray-200/90 flex items-center justify-center text-gray-900 font-medium">
-                <FiUser size={20} className="text-gray-700" />
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-medium shadow-md">
+                {userInitial}
               </div>
-              <span className="uppercase hidden sm:inline text-gray-700">{cachedUser || "Usuario"}</span>
+              <span className="uppercase hidden sm:inline text-gray-700 font-medium">{cachedUser || "Usuario"}</span>
               <FiChevronDown size={16} className="text-gray-700" />
             </button>
 
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
                 {cachedUser && (
-                  <div className="block sm:hidden px-4 py-2 text-sm uppercase text-gray-900 border-b border-gray-100">
+                  <div className="block sm:hidden px-4 py-2 text-sm uppercase text-gray-900 border-b border-gray-100 font-medium">
                     {cachedUser}
                   </div>
                 )}
                 <a
                   href="/perfil"
-                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <FiUser className="mr-2" size={16} />
                   Mi Perfil
@@ -85,7 +87,7 @@ export default function Header() {
                 <div className="border-t border-gray-100 my-1"></div>
                 <button
                   onClick={logOut}
-                  className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                 >
                   <FiLogOut className="mr-2" size={16} />
                   Cerrar sesión
