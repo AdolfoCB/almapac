@@ -1,4 +1,4 @@
-// middleware.js - Tu middleware actual con validación JWT
+// middleware.js - Middleware optimizado para Vercel
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
@@ -17,9 +17,16 @@ const ROLES = {
 const PUBLIC_ROUTES = [
   "/login",
   "/api/auth",
-  "/api/auth/path*",
+  "/api/auth/callback",
+  "/api/auth/session", 
+  "/api/auth/signin",
+  "/api/auth/signout",
+  "/api/auth/providers",
+  "/api/auth/csrf",
   "/health",
   "/api/v1/health",
+  "/_next",
+  "/favicon.ico",
 ];
 
 // Grupos de permisos
@@ -44,134 +51,236 @@ const ROUTE_PERMISSIONS = {
   // ADMIN
   "/usuarios": PERMISSIONS.ADMIN_ONLY,
   "/sesiones": PERMISSIONS.ADMIN_ONLY,
-  // "/api/v1/sessions": PERMISSIONS.ADMIN_ONLY,
-  // "/api/v1/users": PERMISSIONS.ADMIN_ONLY,
-  // "/api/v1/users/:path*": PERMISSIONS.ADMIN_ONLY,
-  // "/api/v1/roles": PERMISSIONS.ADMIN_ONLY,
-  // "/api/v1/roles/:path*": PERMISSIONS.ADMIN_ONLY,
-  // "/api/v1/dashboard": PERMISSIONS.ADMIN_ONLY,
 
   // Barco y Bitácoras
   "/proceso/iniciar/barco": PERMISSIONS.MUELLERO,
   "/proceso/consultar/barco": PERMISSIONS.MUELLERO,
-  // "/api/v1/bitacoras": PERMISSIONS.MUELLERO,
-  // "/api/v1/bitacoras/:path*": PERMISSIONS.MUELLERO,
-  // "/api/v1/bitacoras/export-excel": PERMISSIONS.MUELLERO_LIMITED,
   "/proceso/consultar/bitacora": PERMISSIONS.MUELLERO,
   "/proceso/editar/bitacora": PERMISSIONS.ADMIN_ONLY,
 
   // Equipos
-  // "/api/v1/equipos": PERMISSIONS.EQUIPOS,
-  // "/api/v1/equipos/export-excel": PERMISSIONS.EQUIPOS_LIMITED,
   "/proceso/iniciar/equipo": PERMISSIONS.EQUIPOS,
   "/proceso/consultar/equipo": PERMISSIONS.EQUIPOS,
 
   // Recepción
-  // "/api/v1/recepcion": PERMISSIONS.RECEPCION_FULL,
-  // "/api/v1/recepcion/bitacoras/:path*": PERMISSIONS.RECEPCION_FULL,
-  // "/api/v1/recepcion/barcos": PERMISSIONS.RECEPCION_FULL,
   "/proceso/iniciar/recepcion": PERMISSIONS.RECEPCION_FULL,
   "/proceso/consultar/recepcion": PERMISSIONS.RECEPCION_FULL,
-  // "/api/v1/recepcion/productos": PERMISSIONS.RECEPCION_LIMITED,
-  // "/api/v1/recepcion/barcos/:path*": PERMISSIONS.RECEPCION_LIMITED,
-  // "/api/v1/recepcion/productos/:path*": PERMISSIONS.RECEPCION_LIMITED,
-  // "/api/v1/recepcion/export-excel": PERMISSIONS.RECEPCION_LIMITED,
-  // "/api/v1/recepcion/transportes": PERMISSIONS.RECEPCION_LIMITED,
-  // "/api/v1/recepcion/transportes/:path*": PERMISSIONS.RECEPCION_LIMITED,
-  // "/api/v1/transportes": PERMISSIONS.RECEPCION_LIMITED,
   "/proceso/consultar/recepcion/barcos": PERMISSIONS.RECEPCION_FULL,
-  // "/api/v1/recepcion/:path*": PERMISSIONS.ADMIN_ONLY,
   "/proceso/editar/recepcion": PERMISSIONS.ADMIN_ONLY,
 };
 
-// Headers de seguridad
+// Headers de seguridad optimizados para Vercel
 const SecurityHeaders = {
-  HSTS: "max-age=63072000; includeSubDomains; preload",
-  X_FRAME: "DENY",
-  X_CONTENT: "nosniff",
-  REFERRER: "no-referrer",
-  PERMISSIONS_POLICY: "camera=(), microphone=(), geolocation=()",
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'X-XSS-Protection': '1; mode=block',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
 };
 
-function applySecurityHeaders(response) {
-  Object.entries(SecurityHeaders).forEach(([key, value]) => {
-    response.headers.set(key.replace('_', '-'), value);
+// Configuración de cookies para diferentes ambientes
+const isProduction = process.env.NODE_ENV === 'production';
+const domain = process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL).hostname : undefined;
+
+// Función para limpiar cookies de autenticación
+function clearAuthCookies(response) {
+  const cookieNames = [
+    'next-auth.session-token',
+    '__Secure-next-auth.session-token',
+    'next-auth.csrf-token', 
+    '__Host-next-auth.csrf-token',
+    'next-auth.callback-url',
+    '__Secure-next-auth.callback-url',
+    'next-auth.pkce.code_verifier',
+    '__Secure-next-auth.pkce.code_verifier',
+    'next-auth.state',
+    '__Secure-next-auth.state',
+    'next-auth.nonce',
+    '__Secure-next-auth.nonce',
+  ];
+
+  cookieNames.forEach(name => {
+    // Limpiar para el dominio actual
+    response.cookies.set(name, '', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      domain: isProduction ? domain : undefined,
+      expires: new Date(0),
+      maxAge: 0,
+    });
+    
+    // Limpiar sin dominio (para localhost)
+    response.cookies.set(name, '', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date(0),
+      maxAge: 0,
+    });
   });
+
   return response;
 }
 
+// Función para aplicar headers de seguridad
+function applySecurityHeaders(response) {
+  Object.entries(SecurityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  // CSP específico para la aplicación
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+  
+  response.headers.set('Content-Security-Policy', csp);
+  return response;
+}
+
+// Función para verificar rutas
 function matchRoute(path, pattern) {
   if (pattern.includes(":path*")) {
     return path.startsWith(pattern.replace("/:path*", ""));
   }
+  if (pattern.endsWith("*")) {
+    return path.startsWith(pattern.slice(0, -1));
+  }
   return path === pattern;
+}
+
+// Función para verificar si es ruta pública
+function isPublicRoute(pathname) {
+  return PUBLIC_ROUTES.some(route => {
+    if (route.endsWith("*")) {
+      return pathname.startsWith(route.slice(0, -1));
+    }
+    return matchRoute(pathname, route);
+  });
 }
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
+  const response = NextResponse.next();
 
-  // Rutas públicas
-  if (PUBLIC_ROUTES.some(r => matchRoute(pathname, r))) {
-    return applySecurityHeaders(NextResponse.next());
-  }
+  // Aplicar headers de seguridad a todas las respuestas
+  applySecurityHeaders(response);
 
-  // Verificar token JWT
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) {
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json({ 
-        error: "Not authenticated", 
-        message: "Authentication required" 
-      }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL("/login?authorize=SessionRequired", req.url));
-  }
-
-  // Verificar que el token no haya expirado (JWT ya maneja esto, pero por seguridad)
-  const tokenAge = Date.now() - (token.loginTime || 0);
-  const maxAge = 12 * 60 * 60 * 1000; // 12 horas en ms
-  
-  if (tokenAge > maxAge) {
-    console.log(`Token expirado para usuario ${token.username}`);
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json({ 
-        error: "Token expired", 
-        message: "Please login again" 
-      }, { status: 401 });
-    }
-    const response = NextResponse.redirect(new URL("/login?authorize=TokenExpired", req.url));
-    response.cookies.delete("next-auth.session-token");
-    response.cookies.delete("next-auth.csrf-token");
+  // Permitir rutas públicas
+  if (isPublicRoute(pathname)) {
     return response;
   }
 
-  // Verificación de permisos por ruta
-  const routeKey = Object.keys(ROUTE_PERMISSIONS).find(route => matchRoute(pathname, route));
-  const allowedRoles = routeKey ? ROUTE_PERMISSIONS[routeKey] : null;
-  
-  // if (!allowedRoles) {
-  //   if (pathname.startsWith("/api")) {
-  //     return NextResponse.json({ 
-  //       error: "Unauthorized", 
-  //       message: "Access denied" 
-  //     }, { status: 403 });
-  //   }
-  //   return NextResponse.redirect(new URL("/403", req.url));
-  // }
+  try {
+    // Verificar token JWT con configuración específica para Vercel
+    const token = await getToken({ 
+      req, 
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: isProduction,
+      salt: isProduction ? '__Secure-authjs.session-token' : 'authjs.session-token',
+    });
 
-  // Verificar permisos
-  if (allowedRoles.length === 0 || allowedRoles.includes(token.roleId)) {
-    return applySecurityHeaders(NextResponse.next());
+    if (!token) {
+      console.log(`❌ [middleware] No token found for ${pathname}`);
+      
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ 
+          error: "Not authenticated", 
+          message: "Authentication required",
+          code: "AUTH_REQUIRED"
+        }, { status: 401 });
+      }
+      
+      const loginUrl = new URL("/login", req.url);
+      loginUrl.searchParams.set("authorize", "SessionRequired");
+      loginUrl.searchParams.set("callbackUrl", req.url);
+      
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      return clearAuthCookies(redirectResponse);
+    }
+
+    // Verificar expiración del token
+    const tokenAge = Date.now() - (token.loginTime || 0);
+    const maxAge = 24 * 60 * 60 * 1000; // 24 horas
+    const inactivityLimit = 12 * 60 * 60 * 1000; // 12 horas de inactividad
+    
+    const isTokenExpired = tokenAge > maxAge;
+    const isInactive = token.lastActivity && (Date.now() - token.lastActivity) > inactivityLimit;
+    
+    if (isTokenExpired || isInactive) {
+      const reason = isTokenExpired ? "TokenExpired" : "InactivityTimeout";
+      console.log(`⏰ [middleware] ${reason} para usuario ${token.username}`);
+      
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ 
+          error: "Token expired", 
+          message: "Please login again",
+          code: reason.toUpperCase()
+        }, { status: 401 });
+      }
+      
+      const loginUrl = new URL("/login", req.url);
+      loginUrl.searchParams.set("authorize", reason);
+      loginUrl.searchParams.set("callbackUrl", req.url);
+      
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      return clearAuthCookies(redirectResponse);
+    }
+
+    // Verificación de permisos por ruta
+    const routeKey = Object.keys(ROUTE_PERMISSIONS).find(route => matchRoute(pathname, route));
+    const allowedRoles = routeKey ? ROUTE_PERMISSIONS[routeKey] : PERMISSIONS.AUTHENTICATED;
+    
+    // Verificar permisos
+    if (allowedRoles.length === 0 || allowedRoles.includes(token.roleId)) {
+      // Actualizar timestamp de última actividad en el header
+      response.headers.set('X-Last-Activity', Date.now().toString());
+      return response;
+    }
+
+    // Acceso denegado
+    console.log(`🚫 [middleware] Acceso denegado: roleId ${token.roleId} no permitido en ruta ${pathname}`);
+    
+    if (pathname.startsWith("/api")) {
+      return NextResponse.json({ 
+        error: "Insufficient permissions", 
+        message: "Access denied",
+        code: "INSUFFICIENT_PERMISSIONS"
+      }, { status: 403 });
+    }
+    
+    return NextResponse.redirect(new URL("/403", req.url));
+
+  } catch (error) {
+    console.error(`💥 [middleware] Error procesando ${pathname}:`, error);
+    
+    if (pathname.startsWith("/api")) {
+      return NextResponse.json({ 
+        error: "Internal server error", 
+        message: "Authentication verification failed",
+        code: "AUTH_ERROR"
+      }, { status: 500 });
+    }
+    
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("authorize", "AuthError");
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    return clearAuthCookies(redirectResponse);
   }
-
-  // console.log(`Acceso denegado: roleId ${token.roleId} no permitido en ruta ${pathname}`);
-  // if (pathname.startsWith("/api")) {
-  //   return NextResponse.json({ 
-  //     error: "Insufficient permissions", 
-  //     message: "Access denied" 
-  //   }, { status: 403 });
-  // }
-  return NextResponse.redirect(new URL("/403", req.url));
 }
 
 export const config = {
