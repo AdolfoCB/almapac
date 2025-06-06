@@ -1,4 +1,4 @@
-// middleware.js - Middleware optimizado para Vercel
+// middleware.js - Middleware CORREGIDO para Vercel
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
@@ -77,79 +77,35 @@ const SecurityHeaders = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   'X-XSS-Protection': '1; mode=block',
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Resource-Policy': 'same-origin',
 };
 
-// Configuración de cookies para diferentes ambientes
-const isProduction = process.env.NODE_ENV === 'production';
-const domain = process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL).hostname : undefined;
-
-// Función para limpiar cookies de autenticación
-function clearAuthCookies(response) {
-  const cookieNames = [
-    'next-auth.session-token',
-    '__Secure-next-auth.session-token',
-    'next-auth.csrf-token', 
-    '__Host-next-auth.csrf-token',
-    'next-auth.callback-url',
-    '__Secure-next-auth.callback-url',
-    'next-auth.pkce.code_verifier',
-    '__Secure-next-auth.pkce.code_verifier',
-    'next-auth.state',
-    '__Secure-next-auth.state',
-    'next-auth.nonce',
-    '__Secure-next-auth.nonce',
-  ];
-
-  cookieNames.forEach(name => {
-    // Limpiar para el dominio actual
-    response.cookies.set(name, '', {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
-      path: '/',
-      domain: isProduction ? domain : undefined,
-      expires: new Date(0),
-      maxAge: 0,
-    });
-    
-    // Limpiar sin dominio (para localhost)
-    response.cookies.set(name, '', {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
-      path: '/',
-      expires: new Date(0),
-      maxAge: 0,
-    });
-  });
-
-  return response;
-}
-
-// Función para aplicar headers de seguridad
-function applySecurityHeaders(response) {
-  Object.entries(SecurityHeaders).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
+// 🔧 CONFIGURACIÓN CRÍTICA PARA DETECTAR URL EN VERCEL
+function getBaseUrl(req) {
+  // 1. NEXTAUTH_URL explícito
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
   
-  // CSP específico para la aplicación
-  const csp = [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self'",
-    "connect-src 'self'",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join('; ');
+  // 2. En desarrollo
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3000';
+  }
   
-  response.headers.set('Content-Security-Policy', csp);
-  return response;
+  // 3. Detectar desde headers de Vercel
+  const host = req.headers.get('host');
+  const protocol = req.headers.get('x-forwarded-proto') || 'https';
+  
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+  
+  // 4. VERCEL_URL automático
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // 5. Fallback
+  return 'https://almapac.vercel.app';
 }
 
 // Función para verificar rutas
@@ -173,45 +129,68 @@ function isPublicRoute(pathname) {
   });
 }
 
+// Función para aplicar headers de seguridad
+function applySecurityHeaders(response) {
+  Object.entries(SecurityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  return response;
+}
+
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
-  const response = NextResponse.next();
+  
+  // Log para debugging
+  console.log(`🔍 [middleware] Procesando: ${pathname}`);
 
   // Aplicar headers de seguridad a todas las respuestas
+  const response = NextResponse.next();
   applySecurityHeaders(response);
 
   // Permitir rutas públicas
   if (isPublicRoute(pathname)) {
+    console.log(`✅ [middleware] Ruta pública permitida: ${pathname}`);
     return response;
   }
 
   try {
-    // Verificar token JWT con configuración específica para Vercel
-    const token = await getToken({ 
-      req, 
+    // 🔥 CONFIGURACIÓN CRÍTICA PARA GETTOKEN EN VERCEL
+    const baseUrl = getBaseUrl(req);
+    
+    // Configuración específica para getToken en Vercel
+    const tokenOptions = {
+      req,
       secret: process.env.NEXTAUTH_SECRET,
-      secureCookie: isProduction,
-      salt: isProduction ? '__Secure-authjs.session-token' : 'authjs.session-token',
-    });
+      // 🚨 CRÍTICO: Configurar cookieName basado en el entorno
+      cookieName: process.env.NODE_ENV === 'production' 
+        ? '__Secure-next-auth.session-token'
+        : 'next-auth.session-token',
+      // 🚨 CRÍTICO: Usar la URL detectada
+      secureCookie: process.env.NODE_ENV === 'production',
+      // Salt debe coincidir con la configuración de NextAuth
+      salt: process.env.NODE_ENV === 'production' 
+        ? '__Secure-next-auth.session-token'
+        : 'next-auth.session-token',
+    };
+
+    console.log(`🔧 [middleware] Usando baseUrl: ${baseUrl}`);
+    console.log(`🍪 [middleware] Cookie name: ${tokenOptions.cookieName}`);
+
+    // Verificar token JWT
+    const token = await getToken(tokenOptions);
 
     if (!token) {
       console.log(`❌ [middleware] No token found for ${pathname}`);
-      
-      if (pathname.startsWith("/api")) {
-        return NextResponse.json({ 
-          error: "Not authenticated", 
-          message: "Authentication required",
-          code: "AUTH_REQUIRED"
-        }, { status: 401 });
-      }
       
       const loginUrl = new URL("/login", req.url);
       loginUrl.searchParams.set("authorize", "SessionRequired");
       loginUrl.searchParams.set("callbackUrl", req.url);
       
-      const redirectResponse = NextResponse.redirect(loginUrl);
-      return clearAuthCookies(redirectResponse);
+      console.log(`🔄 [middleware] Redirecting to: ${loginUrl.toString()}`);
+      return NextResponse.redirect(loginUrl);
     }
+
+    console.log(`✅ [middleware] Token encontrado para usuario: ${token.username}`);
 
     // Verificar expiración del token
     const tokenAge = Date.now() - (token.loginTime || 0);
@@ -225,20 +204,11 @@ export async function middleware(req) {
       const reason = isTokenExpired ? "TokenExpired" : "InactivityTimeout";
       console.log(`⏰ [middleware] ${reason} para usuario ${token.username}`);
       
-      if (pathname.startsWith("/api")) {
-        return NextResponse.json({ 
-          error: "Token expired", 
-          message: "Please login again",
-          code: reason.toUpperCase()
-        }, { status: 401 });
-      }
-      
       const loginUrl = new URL("/login", req.url);
       loginUrl.searchParams.set("authorize", reason);
       loginUrl.searchParams.set("callbackUrl", req.url);
       
-      const redirectResponse = NextResponse.redirect(loginUrl);
-      return clearAuthCookies(redirectResponse);
+      return NextResponse.redirect(loginUrl);
     }
 
     // Verificación de permisos por ruta
@@ -247,6 +217,7 @@ export async function middleware(req) {
     
     // Verificar permisos
     if (allowedRoles.length === 0 || allowedRoles.includes(token.roleId)) {
+      console.log(`✅ [middleware] Acceso permitido para ${token.username} a ${pathname}`);
       // Actualizar timestamp de última actividad en el header
       response.headers.set('X-Last-Activity', Date.now().toString());
       return response;
@@ -255,31 +226,14 @@ export async function middleware(req) {
     // Acceso denegado
     console.log(`🚫 [middleware] Acceso denegado: roleId ${token.roleId} no permitido en ruta ${pathname}`);
     
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json({ 
-        error: "Insufficient permissions", 
-        message: "Access denied",
-        code: "INSUFFICIENT_PERMISSIONS"
-      }, { status: 403 });
-    }
-    
     return NextResponse.redirect(new URL("/403", req.url));
 
   } catch (error) {
     console.error(`💥 [middleware] Error procesando ${pathname}:`, error);
     
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json({ 
-        error: "Internal server error", 
-        message: "Authentication verification failed",
-        code: "AUTH_ERROR"
-      }, { status: 500 });
-    }
-    
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("authorize", "AuthError");
-    const redirectResponse = NextResponse.redirect(loginUrl);
-    return clearAuthCookies(redirectResponse);
+    return NextResponse.redirect(loginUrl);
   }
 }
 
