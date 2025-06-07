@@ -222,9 +222,8 @@ export default function Dashboard() {
       <main className="pt-20 sm:pt-24 pb-4 sm:pb-6 lg:pb-8 w-full">
         <div className="max-w-[95%] sm:max-w-7xl 2xl:max-w-[90%] mx-auto px-3 sm:px-4 lg:px-6 space-y-6 sm:space-y-8">
           
-          {/* Welcome Section con colores ALMAPAC */}
-          <section className="bg-white rounded-xl shadow-lg border border-orange-100 p-4 sm:p-6 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 via-red-500 to-blue-700"></div>
+          {/* Welcome Section sin borde colorido */}
+          <section className="bg-white rounded-xl shadow-lg p-4 sm:p-6 relative overflow-hidden">
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
               <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
