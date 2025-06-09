@@ -88,9 +88,30 @@ function determineStateFromContent(bitacora: {
   if (bitacora.eliminado) return EstadoBitacora.ELIMINADA;
   // Si ya está completada, mantener ese estado
   if (bitacora.estado === EstadoBitacora.COMPLETADA) return EstadoBitacora.COMPLETADA;
-  if (bitacora.operaciones.length > 0) return EstadoBitacora.EN_PROCESO;
+  if (bitacora.operaciones && bitacora.operaciones.length > 0) return EstadoBitacora.EN_PROCESO;
   return EstadoBitacora.CREADA;
 }
+
+// Función helper para parsear datos que pueden venir como string JSON o como array/objeto
+const parseJsonField = (field: any): any[] => {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  if (typeof field === 'string') {
+    try {
+      return JSON.parse(field);
+    } catch (e) {
+      console.warn('Error parsing JSON field:', field, e);
+      return [];
+    }
+  }
+  return [];
+};
+
+// Función helper para validar campos de forma segura
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return "";
+  return String(value);
+};
 
 // --- Tipos ---
 interface OptionType {
@@ -270,10 +291,6 @@ export default function BitacoraEditor() {
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  // Verificar si la bitácora es editable
-  const isEditable = formData.bitacora.estado !== EstadoBitacora.COMPLETADA && 
-                     formData.bitacora.estado !== EstadoBitacora.ELIMINADA;
-
   // Carga inicial: solo la bitácora (que incluye barcoSnapshot)
   useEffect(() => {
     const id = localStorage.getItem("bitacoraId");
@@ -284,6 +301,10 @@ export default function BitacoraEditor() {
     fetch(`/api/v1/bitacoras/${id}`)
       .then(r => r.json())
       .then(res => {
+        if (!res.data) {
+          throw new Error("Bitácora no encontrada");
+        }
+        
         const bs = res.data.barco; // barco como relación
         const bd = res.data;
         
@@ -293,40 +314,45 @@ export default function BitacoraEditor() {
           estado = EstadoBitacora.CREADA;
         }
         
+        // Parsear arrays de forma segura
+        const tipoCarga = parseJsonField(bs?.tipoCarga);
+        const sistemaUtilizado = parseJsonField(bs?.sistemaUtilizado);
+        
         setFormData({
           barco: {
-            id: bs.id,
-            bValue: bs.muelle,
-            valorMuelle: bs.vaporBarco,
-            arriboFecha: bs.fechaArribo,
-            arriboHora: bs.horaArribo,
-            atraqueFecha: bs.fechaAtraque,
-            atraqueHora: bs.horaAtraque,
-            recibidoFecha: bs.fechaRecibido,
-            recibidoHora: bs.horaRecibido,
-            inicioOperacionesFecha: bs.fechaInicioOperaciones,
-            inicioOperacionesHora: bs.horaInicioOperaciones,
-            finOperacionesFecha: bs.fechaFinOperaciones,
-            finOperacionesHora: bs.horaFinOperaciones,
-            tipoCarga: JSON.parse(bs.tipoCarga),
-            sistemaUtilizado: JSON.parse(bs.sistemaUtilizado),
+            id: bs?.id,
+            bValue: safeString(bs?.muelle),
+            valorMuelle: safeString(bs?.vaporBarco),
+            arriboFecha: safeString(bs?.fechaArribo),
+            arriboHora: safeString(bs?.horaArribo),
+            atraqueFecha: safeString(bs?.fechaAtraque),
+            atraqueHora: safeString(bs?.horaAtraque),
+            recibidoFecha: safeString(bs?.fechaRecibido),
+            recibidoHora: safeString(bs?.horaRecibido),
+            inicioOperacionesFecha: safeString(bs?.fechaInicioOperaciones),
+            inicioOperacionesHora: safeString(bs?.horaInicioOperaciones),
+            finOperacionesFecha: safeString(bs?.fechaFinOperaciones),
+            finOperacionesHora: safeString(bs?.horaFinOperaciones),
+            tipoCarga: tipoCarga,
+            sistemaUtilizado: sistemaUtilizado,
           },
           bitacora: {
             id: bd.id,
-            fechaInicio: bd.fechaInicio,
-            fecha: bd.fecha,
-            fechaCierre: bd.fechaCierre || "",
-            muellero: bd.muellero,
-            turnoInicio: bd.turnoInicio,
-            turnoFin: bd.turnoFin,
-            operaciones: bd.operaciones,
-            observaciones: bd.observaciones,
+            fechaInicio: safeString(bd.fechaInicio),
+            fecha: safeString(bd.fecha),
+            fechaCierre: safeString(bd.fechaCierre),
+            muellero: safeString(bd.muellero),
+            turnoInicio: safeString(bd.turnoInicio),
+            turnoFin: safeString(bd.turnoFin),
+            operaciones: Array.isArray(bd.operaciones) ? bd.operaciones : [],
+            observaciones: safeString(bd.observaciones),
             estado: estado,                         // Estado desde BD
             eliminado: bd.eliminado || false,       // Campo eliminado
           },
         });
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Error cargando bitácora:', error);
         Swal.fire("Error", "No se pudo cargar la bitácora", "error").then(() =>
           router.push("/proceso/consultar/bitacora")
         );
@@ -369,11 +395,6 @@ export default function BitacoraEditor() {
   };
 
   const addOrUpdateOperacion = () => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede editar una bitácora completada o eliminada", "error");
-      return;
-    }
-    
     if (!newOperacion.inicio || !newOperacion.final || !newOperacion.actividad) {
       Swal.fire("Error", "Complete todos los campos de operación", "error");
       return;
@@ -398,20 +419,11 @@ export default function BitacoraEditor() {
   };
 
   const handleEditOp = (i: number) => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede editar una bitácora completada o eliminada", "error");
-      return;
-    }
     setNewOperacion(formData.bitacora.operaciones[i]);
     setEditingIndex(i);
   };
   
   const handleDeleteOp = (i: number) => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede editar una bitácora completada o eliminada", "error");
-      return;
-    }
-    
     Swal.fire({
       title: "¿Eliminar actividad?",
       icon: "warning",
@@ -437,11 +449,6 @@ export default function BitacoraEditor() {
 
   // Guardar: envía TODOS los campos que el endpoint PUT espera
   const handleSave = async () => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede guardar una bitácora completada o eliminada", "error");
-      return;
-    }
-    
     const res = await Swal.fire({
       icon: "question",
       title: "¿Desea guardar los cambios?",
@@ -539,16 +546,14 @@ export default function BitacoraEditor() {
             )}
           </div>
         </div>
-        {!isEditable && (
-          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-yellow-800 text-sm font-medium">
-              ⚠️ Esta bitácora no se puede editar porque está {formData.bitacora.estado.toLowerCase()}
-            </p>
-          </div>
-        )}
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <p className="text-blue-800 text-sm font-medium">
+            ℹ️ Como administrador, puede editar esta bitácora en cualquier estado
+          </p>
+        </div>
       </section>
 
-      {/* Barco (snapshot editable solo si es editable) */}
+      {/* Barco (snapshot editable) */}
       <section className="max-w-5xl mx-auto bg-white shadow-md mt-4 p-4 mb-4 rounded-md">
         <h2 className="text-xl font-bold mb-4">Barco</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
@@ -559,7 +564,6 @@ export default function BitacoraEditor() {
               value={formData.barco.bValue}
               onChange={e => updateBarco({ bValue: e.target.value })}
               className="w-full h-9 border border-gray-300 rounded-md px-2 py-1"
-              readOnly
             />
           </div>
           <div>
@@ -569,7 +573,6 @@ export default function BitacoraEditor() {
               value={formData.barco.valorMuelle}
               onChange={e => updateBarco({ valorMuelle: e.target.value })}
               className="w-full h-9 border border-gray-300 rounded-md px-2 py-1"
-              readOnly
             />
           </div>
         </div>
@@ -593,7 +596,6 @@ export default function BitacoraEditor() {
                       });
                     }}
                     className="h-4 w-4"
-                    disabled={!isEditable}
                   />
                   <span className="text-xs">{tipo}</span>
                 </label>
@@ -617,7 +619,6 @@ export default function BitacoraEditor() {
                       });
                     }}
                     className="h-4 w-4"
-                    disabled={!isEditable}
                   />
                   <span className="text-xs">{s}</span>
                 </label>
@@ -645,7 +646,6 @@ export default function BitacoraEditor() {
                     value={(formData.barco as any)[sec.fecha]}
                     onChange={e => updateBarco({ [sec.fecha]: e.target.value })}
                     className="w-full border rounded-md px-2 py-1"
-                    disabled={!isEditable}
                   />
                 </div>
                 <div>
@@ -655,7 +655,6 @@ export default function BitacoraEditor() {
                     value={(formData.barco as any)[sec.hora]}
                     onChange={e => updateBarco({ [sec.hora]: e.target.value })}
                     className="w-full border rounded-md px-2 py-1"
-                    disabled={!isEditable}
                   />
                 </div>
               </div>
@@ -673,21 +672,18 @@ export default function BitacoraEditor() {
             <input
               type="text"
               value={formData.bitacora.fechaInicio}
-              onChange={e => updateBitacora({ fecha: e.target.value })}
+              onChange={e => updateBitacora({ fechaInicio: e.target.value })}
               className="w-full h-9 border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
               readOnly
             />
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1 uppercase">FECHA CIERRE</label>
             <input
-              type="text"
+              type="date"
               value={formData.bitacora.fechaCierre}
               onChange={e => updateBitacora({ fechaCierre: e.target.value })}
               className="w-full h-9 border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
-              readOnly
             />
           </div>
           <div>
@@ -699,7 +695,6 @@ export default function BitacoraEditor() {
               value={formData.bitacora.muellero}
               onChange={e => updateBitacora({ muellero: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -709,7 +704,6 @@ export default function BitacoraEditor() {
               value={formData.bitacora.turnoInicio}
               onChange={e => updateBitacora({ turnoInicio: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -719,126 +713,123 @@ export default function BitacoraEditor() {
               value={formData.bitacora.turnoFin}
               onChange={e => updateBitacora({ turnoFin: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
         </div>
 
-        {/* Nueva Operación - Solo mostrar si es editable */}
-        {isEditable && (
-          <section className="mb-6 border rounded-md p-4">
-            <h2 className="text-lg font-semibold mb-2">Operaciones</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-semibold">BODEGA</label>
-                <Select
-                  options={bodegaOptions}
-                  value={bodegaOptions.find(o => o.value === newOperacion.bodega) || null}
-                  onChange={opt => setNewOperacion(p => ({ ...p, bodega: (opt as OptionType).value }))}
-                  classNamePrefix="react-select"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Inicio</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    name="inicio"
-                    value={newOperacion.inicio}
-                    onChange={handleOperacionChange}
-                    className="w-full h-10 border rounded-sm px-2"
-                    step="1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const hora = new Date().toLocaleTimeString("en-GB", {
-                        hour12: false,
-                        timeZone: "America/El_Salvador",
-                      });
-                      setNewOperacion(p => actualizarDuracion({ ...p, inicio: hora }));
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
-                  >
-                    Ahora
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Final</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    name="final"
-                    value={newOperacion.final}
-                    onChange={handleOperacionChange}
-                    className="w-full h-10 border rounded-sm px-2"
-                    step="1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const hora = new Date().toLocaleTimeString("en-GB", {
-                        hour12: false,
-                        timeZone: "America/El_Salvador",
-                      });
-                      setNewOperacion(p => actualizarDuracion({ ...p, final: hora }));
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
-                  >
-                    Ahora
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Minutos</label>
-                <input
-                  type="text"
-                  name="minutos"
-                  value={newOperacion.minutos}
-                  readOnly
-                  className="w-full h-10 border rounded-sm px-2 bg-gray-50"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold">Actividad</label>
-                <CreatableSelect
-                  options={actividadOptions}
-                  value={actividadOptions.find(o => o.value === newOperacion.actividad) || null}
-                  onChange={opt => setNewOperacion(p => ({ ...p, actividad: (opt as OptionType).value }))}
-                  onCreateOption={inputValue => {
-                    const newOpt = { value: inputValue, label: inputValue };
-                    setActividadOptions(prev => [...prev, newOpt]);
-                    setNewOperacion(p => ({ ...p, actividad: inputValue }));
-                  }}
-                  classNamePrefix="react-select"
-                />
-              </div>
+        {/* Nueva Operación */}
+        <section className="mb-6 border rounded-md p-4">
+          <h2 className="text-lg font-semibold mb-2">Operaciones</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold">BODEGA</label>
+              <Select
+                options={bodegaOptions}
+                value={bodegaOptions.find(o => o.value === newOperacion.bodega) || null}
+                onChange={opt => setNewOperacion(p => ({ ...p, bodega: (opt as OptionType).value }))}
+                classNamePrefix="react-select"
+              />
             </div>
-            <div className="mt-4 flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={addOrUpdateOperacion}
-                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-              >
-                {editingIndex !== null ? <FiEdit size={20} /> : <FiPlus size={20} />}
-                {editingIndex !== null ? "Actualizar" : "Agregar"}
-              </button>
-              {editingIndex !== null && (
+            <div>
+              <label className="block text-sm font-semibold">Inicio</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  name="inicio"
+                  value={newOperacion.inicio}
+                  onChange={handleOperacionChange}
+                  className="w-full h-10 border rounded-sm px-2"
+                  step="1"
+                />
                 <button
                   type="button"
                   onClick={() => {
-                    setNewOperacion({ bodega: "", inicio: "", final: "", minutos: "", actividad: "" });
-                    setEditingIndex(null);
+                    const hora = new Date().toLocaleTimeString("en-GB", {
+                      hour12: false,
+                      timeZone: "America/El_Salvador",
+                    });
+                    setNewOperacion(p => actualizarDuracion({ ...p, inicio: hora }));
                   }}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
                 >
-                  Cancelar
+                  Ahora
                 </button>
-              )}
+              </div>
             </div>
-          </section>
-        )}
+            <div>
+              <label className="block text-sm font-semibold">Final</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  name="final"
+                  value={newOperacion.final}
+                  onChange={handleOperacionChange}
+                  className="w-full h-10 border rounded-sm px-2"
+                  step="1"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const hora = new Date().toLocaleTimeString("en-GB", {
+                      hour12: false,
+                      timeZone: "America/El_Salvador",
+                    });
+                    setNewOperacion(p => actualizarDuracion({ ...p, final: hora }));
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
+                >
+                  Ahora
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold">Minutos</label>
+              <input
+                type="text"
+                name="minutos"
+                value={newOperacion.minutos}
+                readOnly
+                className="w-full h-10 border rounded-sm px-2 bg-gray-50"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-semibold">Actividad</label>
+              <CreatableSelect
+                options={actividadOptions}
+                value={actividadOptions.find(o => o.value === newOperacion.actividad) || null}
+                onChange={opt => setNewOperacion(p => ({ ...p, actividad: (opt as OptionType).value }))}
+                onCreateOption={inputValue => {
+                  const newOpt = { value: inputValue, label: inputValue };
+                  setActividadOptions(prev => [...prev, newOpt]);
+                  setNewOperacion(p => ({ ...p, actividad: inputValue }));
+                }}
+                classNamePrefix="react-select"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={addOrUpdateOperacion}
+              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+            >
+              {editingIndex !== null ? <FiEdit size={20} /> : <FiPlus size={20} />}
+              {editingIndex !== null ? "Actualizar" : "Agregar"}
+            </button>
+            {editingIndex !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNewOperacion({ bodega: "", inicio: "", final: "", minutos: "", actividad: "" });
+                  setEditingIndex(null);
+                }}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        </section>
 
         {/* Tabla de Operaciones */}
         <section className="mb-6 border rounded-md p-4">
@@ -857,18 +848,18 @@ export default function BitacoraEditor() {
                   <th className="p-2 border whitespace-nowrap">FINAL</th>
                   <th className="p-2 border whitespace-nowrap">MINUTOS</th>
                   <th className="p-2 border whitespace-nowrap">ACTIVIDAD</th>
-                  {isEditable && <th className="p-2 border whitespace-nowrap">ACCIÓN</th>}
+                  <th className="p-2 border whitespace-nowrap">ACCIÓN</th>
                 </tr>
               </thead>
               <tbody>
-                {formData.bitacora.operaciones.map((op, idx) => (
-                  <tr key={idx} className="border-b">
-                    <td className="p-2 border whitespace-nowrap">{op.bodega}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.inicio}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.final}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.minutos}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.actividad}</td>
-                    {isEditable && (
+                {formData.bitacora.operaciones && formData.bitacora.operaciones.length > 0 ? (
+                  formData.bitacora.operaciones.map((op, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2 border whitespace-nowrap">{op.bodega}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.inicio}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.final}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.minutos}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.actividad}</td>
                       <td className="p-2 border text-center flex items-center justify-center gap-2 whitespace-nowrap">
                         <button onClick={() => handleEditOp(idx)} title="Actualizar" className="text-green-500 hover:text-green-700">
                           <FiEdit size={23} />
@@ -877,11 +868,11 @@ export default function BitacoraEditor() {
                           <FiTrash2 size={23} />
                         </button>
                       </td>
-                    )}
-                  </tr>
-                )) || (
+                    </tr>
+                  ))
+                ) : (
                   <tr>
-                    <td colSpan={isEditable ? 6 : 5} className="p-4 text-center text-gray-500">
+                    <td colSpan={6} className="p-4 text-center text-gray-500">
                       No hay operaciones registradas
                     </td>
                   </tr>
@@ -899,8 +890,7 @@ export default function BitacoraEditor() {
             value={formData.bitacora.observaciones}
             onChange={e => updateBitacora({ observaciones: e.target.value })}
             className="w-full border border-gray-300 rounded-md px-2 py-1 resize-y"
-            disabled={!isEditable}
-            placeholder={!isEditable ? "Esta bitácora no se puede editar" : "Escriba sus observaciones aquí..."}
+            placeholder="Escriba sus observaciones aquí..."
           />
         </section>
 
@@ -910,16 +900,14 @@ export default function BitacoraEditor() {
             onClick={handleCancel}
             className="bg-white border border-blue-600 text-blue-600 px-4 py-2 rounded-md hover:bg-blue-50"
           >
-            {isEditable ? "Cancelar" : "Volver"}
+            Cancelar
           </button>
-          {isEditable && (
-            <button
-              onClick={handleSave}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-            >
-              Guardar
-            </button>
-          )}
+          <button
+            onClick={handleSave}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+          >
+            Guardar
+          </button>
         </div>
       </section>
     </div>

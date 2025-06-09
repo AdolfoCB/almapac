@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { FiPlus, FiTrash2, FiEdit } from "react-icons/fi";
-import Loader from "../../../../components/Loader";
+import Loader from "@/components/Loader";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import dynamic from "next/dynamic";
@@ -83,9 +83,30 @@ function determineStateFromContent(recepcion: {
   if (recepcion.eliminado) return EstadoRecepcion.ELIMINADA;
   // Si ya está completada, mantener ese estado
   if (recepcion.estado === EstadoRecepcion.COMPLETADA) return EstadoRecepcion.COMPLETADA;
-  if (recepcion.bitacoras.length > 0) return EstadoRecepcion.EN_PROCESO;
+  if (recepcion.bitacoras && recepcion.bitacoras.length > 0) return EstadoRecepcion.EN_PROCESO;
   return EstadoRecepcion.CREADA;
 }
+
+// Función helper para parsear datos que pueden venir como string JSON o como array/objeto
+const parseJsonField = (field: any): any[] => {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  if (typeof field === 'string') {
+    try {
+      return JSON.parse(field);
+    } catch (e) {
+      console.warn('Error parsing JSON field:', field, e);
+      return [];
+    }
+  }
+  return [];
+};
+
+// Función helper para validar campos de forma segura
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return "";
+  return String(value);
+};
 
 // --- Tipos ---
 interface OptionType {
@@ -214,10 +235,6 @@ export default function RecepcionEditor() {
   const [optsPlacas, setOptsPlacas] = useState<OptionType[]>([]);
   const [currentMotoristas, setCurrentMotoristas] = useState<Array<{ nombre: string; placa: string }>>([]);
 
-  // Verificar si la recepción es editable
-  const isEditable = formData.recepcion.estado !== EstadoRecepcion.COMPLETADA && 
-                     formData.recepcion.estado !== EstadoRecepcion.ELIMINADA;
-
   // Carga inicial: cargar la recepción específica
   useEffect(() => {
     const id = localStorage.getItem("recepcionId");
@@ -241,26 +258,31 @@ export default function RecepcionEditor() {
           estado = EstadoRecepcion.CREADA;
         }
         
+        // Parsear los arrays de forma segura
+        const productos = parseJsonField(br?.productos);
+        const puntosDescarga = parseJsonField(br?.puntosDescarga);
+        const transportes = parseJsonField(br?.transportes);
+        
         setFormData({
           barcoRecepcion: {
             id: br?.id,
-            vaporBarco: br?.vaporBarco || "",
-            productos: br?.productos ? JSON.parse(br.productos) : [],
-            puntosDescarga: br?.puntosDescarga ? JSON.parse(br.puntosDescarga) : [],
-            transportes: br?.transportes ? JSON.parse(br.transportes) : [],
+            vaporBarco: safeString(br?.vaporBarco),
+            productos: productos,
+            puntosDescarga: puntosDescarga,
+            transportes: transportes,
           },
           recepcion: {
             id: rd.id,
-            fechaInicio: rd.fechaInicio,
-            fecha: rd.fecha,
-            fechaCierre: rd.fechaCierre || "",
-            producto: rd.producto,
-            nombreBarco: rd.nombreBarco,
-            chequero: rd.chequero,
-            turnoInicio: rd.turnoInicio,
-            turnoFin: rd.turnoFin,
-            puntoCarga: rd.puntoCarga,
-            puntoDescarga: rd.puntoDescarga,
+            fechaInicio: safeString(rd.fechaInicio),
+            fecha: safeString(rd.fecha),
+            fechaCierre: safeString(rd.fechaCierre),
+            producto: safeString(rd.producto),
+            nombreBarco: safeString(rd.nombreBarco),
+            chequero: safeString(rd.chequero),
+            turnoInicio: safeString(rd.turnoInicio),
+            turnoFin: safeString(rd.turnoFin),
+            puntoCarga: safeString(rd.puntoCarga),
+            puntoDescarga: safeString(rd.puntoDescarga),
             bitacoras: Array.isArray(rd.bitacoras) ? rd.bitacoras : [],
             estado: estado,
             eliminado: rd.eliminado || false,
@@ -269,16 +291,13 @@ export default function RecepcionEditor() {
 
         // Configurar opciones si hay barco
         if (br) {
-          const productos = br.productos ? JSON.parse(br.productos) : [];
-          const puntosDescarga = br.puntosDescarga ? JSON.parse(br.puntosDescarga) : [];
-          const transportes = br.transportes ? JSON.parse(br.transportes) : [];
-
           setOptsProductos(productos.map((p: string) => ({ value: p, label: p })));
           setOptsPuntos([...puntosDescarga, "NO APLICA"].map((p: string) => ({ value: p, label: p })));
           setOptsTransportes(transportes.map((t: any) => ({ value: t.id, label: t.nombre })));
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Error cargando recepción:', error);
         Swal.fire("Error", "No se pudo cargar la recepción", "error").then(() =>
           router.push("/proceso/consultar/recepcion")
         );
@@ -322,8 +341,8 @@ export default function RecepcionEditor() {
     const tId = Number(opt.value);
     const trans = formData.barcoRecepcion.transportes.find((t) => t.id === tId);
     if (trans) {
-      setCurrentMotoristas(trans.motoristas);
-      setOptsPlacas(trans.motoristas.map((m) => ({ value: m.placa, label: m.placa })));
+      setCurrentMotoristas(trans.motoristas || []);
+      setOptsPlacas((trans.motoristas || []).map((m) => ({ value: m.placa, label: m.placa })));
       setNewOperacion(o => ({ ...o, transporte: trans.nombre, placa: "", motorista: "" }));
     }
   };
@@ -336,11 +355,6 @@ export default function RecepcionEditor() {
   };
 
   const addOrUpdateOperacion = () => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede editar una recepción completada o eliminada", "error");
-      return;
-    }
-    
     if (!newOperacion.ticket || !newOperacion.transporte || !newOperacion.placa || 
         !newOperacion.horaInicio || !newOperacion.horaFinal) {
       Swal.fire("Error", "Complete todos los campos requeridos", "error");
@@ -374,20 +388,11 @@ export default function RecepcionEditor() {
   };
 
   const handleEditOp = (i: number) => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede editar una recepción completada o eliminada", "error");
-      return;
-    }
     setNewOperacion(formData.recepcion.bitacoras[i]);
     setEditingIndex(i);
   };
   
   const handleDeleteOp = (i: number) => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede editar una recepción completada o eliminada", "error");
-      return;
-    }
-    
     Swal.fire({
       title: "¿Eliminar operación?",
       icon: "warning",
@@ -413,11 +418,6 @@ export default function RecepcionEditor() {
 
   // Guardar: envía TODOS los campos que el endpoint PUT espera
   const handleSave = async () => {
-    if (!isEditable) {
-      Swal.fire("Error", "No se puede guardar una recepción completada o eliminada", "error");
-      return;
-    }
-    
     const res = await Swal.fire({
       icon: "question",
       title: "¿Desea guardar los cambios?",
@@ -518,13 +518,11 @@ export default function RecepcionEditor() {
             )}
           </div>
         </div>
-        {!isEditable && (
-          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-yellow-800 text-sm font-medium">
-              ⚠️ Esta recepción no se puede editar porque está {formData.recepcion.estado.toLowerCase()}
-            </p>
-          </div>
-        )}
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <p className="text-blue-800 text-sm font-medium">
+            ℹ️ Como administrador, puede editar esta recepción en cualquier estado
+          </p>
+        </div>
       </section>
 
       {/* Información del Barco (solo lectura) */}
@@ -554,7 +552,6 @@ export default function RecepcionEditor() {
               value={formData.recepcion.fecha}
               onChange={e => updateRecepcion({ fecha: e.target.value })}
               className="w-full h-9 border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -564,7 +561,6 @@ export default function RecepcionEditor() {
               value={formData.recepcion.fechaCierre}
               onChange={e => updateRecepcion({ fechaCierre: e.target.value })}
               className="w-full h-9 border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -576,7 +572,6 @@ export default function RecepcionEditor() {
               value={formData.recepcion.chequero}
               onChange={e => updateRecepcion({ chequero: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -585,7 +580,6 @@ export default function RecepcionEditor() {
               options={optsProductos}
               value={optsProductos.find(o => o.value === formData.recepcion.producto) || null}
               onChange={opt => updateRecepcion({ producto: (opt as OptionType)?.value as string || "" })}
-              isDisabled={!isEditable}
               placeholder="Selecciona producto..."
               classNamePrefix="react-select"
             />
@@ -597,7 +591,6 @@ export default function RecepcionEditor() {
               value={formData.recepcion.turnoInicio}
               onChange={e => updateRecepcion({ turnoInicio: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -607,7 +600,6 @@ export default function RecepcionEditor() {
               value={formData.recepcion.turnoFin}
               onChange={e => updateRecepcion({ turnoFin: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -617,7 +609,6 @@ export default function RecepcionEditor() {
               value={formData.recepcion.puntoCarga}
               onChange={e => updateRecepcion({ puntoCarga: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-2 py-1"
-              disabled={!isEditable}
             />
           </div>
           <div>
@@ -626,167 +617,164 @@ export default function RecepcionEditor() {
               options={optsPuntos}
               value={optsPuntos.find(o => o.value === formData.recepcion.puntoDescarga) || null}
               onChange={opt => updateRecepcion({ puntoDescarga: (opt as OptionType)?.value as string || "" })}
-              isDisabled={!isEditable}
               placeholder="Selecciona punto..."
               classNamePrefix="react-select"
             />
           </div>
         </div>
 
-        {/* Nueva Operación - Solo mostrar si es editable */}
-        {isEditable && (
-          <section className="mb-6 border rounded-md p-4">
-            <h2 className="text-lg font-semibold mb-2">Operaciones</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-semibold">TICKET</label>
+        {/* Nueva Operación */}
+        <section className="mb-6 border rounded-md p-4">
+          <h2 className="text-lg font-semibold mb-2">Operaciones</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold">TICKET</label>
+              <input
+                type="text"
+                name="ticket"
+                value={newOperacion.ticket}
+                onChange={handleOperacionChange}
+                className="w-full h-10 border rounded-sm px-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold">TRANSPORTE</label>
+              <Select
+                options={optsTransportes}
+                value={optsTransportes.find(o => o.label === newOperacion.transporte) || null}
+                onChange={onOpTransporteChange}
+                classNamePrefix="react-select"
+                placeholder="Selecciona transporte..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold">PLACA</label>
+              <Select
+                options={optsPlacas}
+                value={optsPlacas.find(o => o.value === newOperacion.placa) || null}
+                onChange={onOpPlacaChange}
+                isDisabled={!optsPlacas.length}
+                classNamePrefix="react-select"
+                placeholder={optsPlacas.length ? "Selecciona placa..." : "Seleccione transporte primero"}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold">MOTORISTA</label>
+              <input
+                type="text"
+                name="motorista"
+                value={newOperacion.motorista}
+                readOnly
+                className="w-full h-10 border rounded-sm px-2 bg-gray-50"
+                placeholder="Se carga al elegir placa"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold">Hora Inicio</label>
+              <div className="flex items-center gap-2">
                 <input
-                  type="text"
-                  name="ticket"
-                  value={newOperacion.ticket}
+                  type="time"
+                  name="horaInicio"
+                  value={newOperacion.horaInicio}
                   onChange={handleOperacionChange}
                   className="w-full h-10 border rounded-sm px-2"
+                  step="1"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">TRANSPORTE</label>
-                <Select
-                  options={optsTransportes}
-                  value={optsTransportes.find(o => o.label === newOperacion.transporte) || null}
-                  onChange={onOpTransporteChange}
-                  classNamePrefix="react-select"
-                  placeholder="Selecciona transporte..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">PLACA</label>
-                <Select
-                  options={optsPlacas}
-                  value={optsPlacas.find(o => o.value === newOperacion.placa) || null}
-                  onChange={onOpPlacaChange}
-                  isDisabled={!optsPlacas.length}
-                  classNamePrefix="react-select"
-                  placeholder={optsPlacas.length ? "Selecciona placa..." : "Seleccione transporte primero"}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">MOTORISTA</label>
-                <input
-                  type="text"
-                  name="motorista"
-                  value={newOperacion.motorista}
-                  readOnly
-                  className="w-full h-10 border rounded-sm px-2 bg-gray-50"
-                  placeholder="Se carga al elegir placa"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Hora Inicio</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    name="horaInicio"
-                    value={newOperacion.horaInicio}
-                    onChange={handleOperacionChange}
-                    className="w-full h-10 border rounded-sm px-2"
-                    step="1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const hora = new Date().toLocaleTimeString("en-GB", {
-                        hour12: false,
-                        timeZone: "America/El_Salvador",
-                      });
-                      setNewOperacion(p => actualizarDuracion({ ...p, horaInicio: hora }));
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
-                  >
-                    Ahora
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Hora Final</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    name="horaFinal"
-                    value={newOperacion.horaFinal}
-                    onChange={handleOperacionChange}
-                    className="w-full h-10 border rounded-sm px-2"
-                    step="1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const hora = new Date().toLocaleTimeString("en-GB", {
-                        hour12: false,
-                        timeZone: "America/El_Salvador",
-                      });
-                      setNewOperacion(p => actualizarDuracion({ ...p, horaFinal: hora }));
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
-                  >
-                    Ahora
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Tiempo Total</label>
-                <input
-                  type="text"
-                  name="tiempoTotal"
-                  value={newOperacion.tiempoTotal}
-                  readOnly
-                  className="w-full h-10 border rounded-sm px-2 bg-gray-50"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold">Observaciones</label>
-                <textarea
-                  name="observaciones"
-                  value={newOperacion.observaciones}
-                  onChange={handleOperacionChange}
-                  rows={2}
-                  className="w-full border rounded p-2"
-                  placeholder="Observaciones..."
-                />
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={addOrUpdateOperacion}
-                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-              >
-                {editingIndex !== null ? <FiEdit size={20} /> : <FiPlus size={20} />}
-                {editingIndex !== null ? "Actualizar" : "Agregar"}
-              </button>
-              {editingIndex !== null && (
                 <button
                   type="button"
                   onClick={() => {
-                    setNewOperacion({
-                      ticket: "",
-                      transporte: "",
-                      placa: "",
-                      motorista: "",
-                      horaInicio: "",
-                      horaFinal: "",
-                      tiempoTotal: "",
-                      observaciones: "",
+                    const hora = new Date().toLocaleTimeString("en-GB", {
+                      hour12: false,
+                      timeZone: "America/El_Salvador",
                     });
-                    setEditingIndex(null);
+                    setNewOperacion(p => actualizarDuracion({ ...p, horaInicio: hora }));
                   }}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
                 >
-                  Cancelar
+                  Ahora
                 </button>
-              )}
+              </div>
             </div>
-          </section>
-        )}
+            <div>
+              <label className="block text-sm font-semibold">Hora Final</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  name="horaFinal"
+                  value={newOperacion.horaFinal}
+                  onChange={handleOperacionChange}
+                  className="w-full h-10 border rounded-sm px-2"
+                  step="1"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const hora = new Date().toLocaleTimeString("en-GB", {
+                      hour12: false,
+                      timeZone: "America/El_Salvador",
+                    });
+                    setNewOperacion(p => actualizarDuracion({ ...p, horaFinal: hora }));
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md whitespace-nowrap"
+                >
+                  Ahora
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold">Tiempo Total</label>
+              <input
+                type="text"
+                name="tiempoTotal"
+                value={newOperacion.tiempoTotal}
+                readOnly
+                className="w-full h-10 border rounded-sm px-2 bg-gray-50"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-semibold">Observaciones</label>
+              <textarea
+                name="observaciones"
+                value={newOperacion.observaciones}
+                onChange={handleOperacionChange}
+                rows={2}
+                className="w-full border rounded p-2"
+                placeholder="Observaciones..."
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={addOrUpdateOperacion}
+              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+            >
+              {editingIndex !== null ? <FiEdit size={20} /> : <FiPlus size={20} />}
+              {editingIndex !== null ? "Actualizar" : "Agregar"}
+            </button>
+            {editingIndex !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNewOperacion({
+                    ticket: "",
+                    transporte: "",
+                    placa: "",
+                    motorista: "",
+                    horaInicio: "",
+                    horaFinal: "",
+                    tiempoTotal: "",
+                    observaciones: "",
+                  });
+                  setEditingIndex(null);
+                }}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        </section>
 
         {/* Tabla de Operaciones */}
         <section className="mb-6 border rounded-md p-4">
@@ -808,21 +796,21 @@ export default function RecepcionEditor() {
                   <th className="p-2 border whitespace-nowrap">FINAL</th>
                   <th className="p-2 border whitespace-nowrap">TIEMPO</th>
                   <th className="p-2 border whitespace-nowrap">OBSERVACIONES</th>
-                  {isEditable && <th className="p-2 border whitespace-nowrap">ACCIÓN</th>}
+                  <th className="p-2 border whitespace-nowrap">ACCIÓN</th>
                 </tr>
               </thead>
               <tbody>
-                {formData.recepcion.bitacoras.map((op, idx) => (
-                  <tr key={idx} className="border-b">
-                    <td className="p-2 border whitespace-nowrap">{op.ticket}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.transporte}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.placa}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.motorista}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.horaInicio}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.horaFinal}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.tiempoTotal}</td>
-                    <td className="p-2 border whitespace-nowrap">{op.observaciones}</td>
-                    {isEditable && (
+                {formData.recepcion.bitacoras && formData.recepcion.bitacoras.length > 0 ? (
+                  formData.recepcion.bitacoras.map((op, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2 border whitespace-nowrap">{op.ticket}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.transporte}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.placa}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.motorista}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.horaInicio}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.horaFinal}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.tiempoTotal}</td>
+                      <td className="p-2 border whitespace-nowrap">{op.observaciones}</td>
                       <td className="p-2 border text-center flex items-center justify-center gap-2 whitespace-nowrap">
                         <button onClick={() => handleEditOp(idx)} title="Actualizar" className="text-green-500 hover:text-green-700">
                           <FiEdit size={23} />
@@ -831,11 +819,11 @@ export default function RecepcionEditor() {
                           <FiTrash2 size={23} />
                         </button>
                       </td>
-                    )}
-                  </tr>
-                )) || (
+                    </tr>
+                  ))
+                ) : (
                   <tr>
-                    <td colSpan={isEditable ? 9 : 8} className="p-4 text-center text-gray-500">
+                    <td colSpan={9} className="p-4 text-center text-gray-500">
                       No hay operaciones registradas
                     </td>
                   </tr>
@@ -851,16 +839,14 @@ export default function RecepcionEditor() {
             onClick={handleCancel}
             className="bg-white border border-blue-600 text-blue-600 px-4 py-2 rounded-md hover:bg-blue-50"
           >
-            {isEditable ? "Cancelar" : "Volver"}
+            Cancelar
           </button>
-          {isEditable && (
-            <button
-              onClick={handleSave}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-            >
-              Guardar
-            </button>
-          )}
+          <button
+            onClick={handleSave}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+          >
+            Guardar
+          </button>
         </div>
       </section>
     </div>
